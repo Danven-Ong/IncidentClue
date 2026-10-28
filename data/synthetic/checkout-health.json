@@ -1,0 +1,11 @@
+{
+  "service": "checkout",
+  "evidence": [
+    {
+      "id": "H1",
+      "timestamp": "2026-10-28T03:06:00Z",
+      "kind": "health",
+      "content": "Synthetic diagnostic health snapshot: checkout is not ready. Its readiness detail reports that required configuration PAYMENT_API_URL is missing."
+    }
+  ]
+}

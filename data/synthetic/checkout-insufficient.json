@@ -1,0 +1,6 @@
+{
+  "incident_id": "checkout-003",
+  "service": "checkout",
+  "summary": "A user reports that checkout is unavailable. No logs, health results, or deployment observations have been collected.",
+  "evidence": []
+}

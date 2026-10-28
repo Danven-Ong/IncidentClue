@@ -1,0 +1,41 @@
+name: incidentclue
+
+services:
+  incidentclue:
+    image: incidentclue:local
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    read_only: true
+    network_mode: ${INCIDENTCLUE_NETWORK_MODE:-bridge}
+    volumes:
+      - type: bind
+        source: ./data/synthetic
+        target: /inputs
+        read_only: true
+        bind:
+          create_host_path: false
+      - type: bind
+        source: ./.env
+        target: /config/provider.env
+        read_only: true
+        bind:
+          create_host_path: false
+      - type: volume
+        source: runs
+        target: /app/runs
+    command:
+      - investigate
+      - /inputs/checkout-startup.json
+      - --health-file
+      - /inputs/checkout-health.json
+      - --logs-file
+      - /inputs/checkout-logs.json
+      - --env-file
+      - /config/provider.env
+      - --record-dir
+      - /app/runs
+
+volumes:
+  runs:
+    name: incidentclue-compose-runs

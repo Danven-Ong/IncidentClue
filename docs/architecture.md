@@ -4,16 +4,67 @@ IncidentClue is designed as a web application with a modular Python backend. It 
 
 ## Current implementation
 
-The repository contains backend package configuration and a synthetic incident example. frontend/ currently documents the web-client boundary only. The evidence models and investigation pipeline are pending implementation. There is no CLI, API, frontend application, model integration, or database connection yet.
+The backend implements input/output models, a citation-membership guard, Groq connectivity, single-request diagnosis, and a bounded LangGraph health/log investigation. The CLI exposes both flows with local run records. Offline tests exercise the installed SDK through a fake HTTP transport. Live diagnosis and graph execution succeeded; actual paths and semantic limitations are recorded. The HTTP API, frontend, database, durable checkpoint recovery, and broader evaluation remain pending.
 
-## Proposed request flow
+## Incident input contract
+
+| Field | Rule |
+| --- | --- |
+| incident_id | Required, nonempty string identifying the incident |
+| service | Required, nonempty string identifying the affected service |
+| summary | Required, nonempty description of the reported symptoms |
+| evidence | Required list of validated Evidence records; may be empty |
+
+Each Evidence record requires a nonempty id and content, a parseable timestamp, and a kind of deployment, log, or health. Evidence IDs must be unique within an incident so a citation identifies exactly one observation. Separate incidents may reuse the same evidence IDs; references therefore need the incident context.
+
+An explicitly empty list represents a snapshot with no observations. A missing or null evidence field is rejected as malformed input. Input validity does not establish the truth of observations or the cause of an incident.
+
+## Diagnosis output contract
+
+All five fields must be supplied, including probable_cause when its value is null. Unexpected fields are rejected.
+
+| Field | Rule |
+| --- | --- |
+| status | hypothesis or insufficient_evidence |
+| probable_cause | Required string or null; a hypothesis requires nonblank text, while insufficient_evidence requires null |
+| evidence_ids | Required list of nonblank strings; a hypothesis requires at least one ID |
+| missing_evidence | Required list of strings identifying information still needed |
+| next_checks | Required list of strings describing suggested diagnostic checks |
+
+An insufficient-evidence result may cite inconclusive observations without asserting a cause. Suggested checks are text only and do not authorize execution.
+
+The schema checks structure and cross-field consistency. The separate validate_evidence_references(incident, diagnosis) function in backend/src/incidentclue/diagnosis.py checks whether every cited ID exists in the explicitly supplied incident. diagnose_incident performs both checks before returning a Diagnosis. Consumers that bypass that function must perform both themselves; the schema alone does not check incident-specific references.
+
+The guard uses exact, case-sensitive ID matching and raises ValueError listing unknown IDs in deterministic order. It checks citations even when the result is insufficient_evidence, accepts an empty citation list when that status permits it, and does not change either object. Its time complexity is linear in the number of input/cited IDs, plus sorting unknown IDs for the error message.
+
+An ID present only in a different incident fails this check. Because IDs may be reused across incidents, the caller must associate the result with the correct input snapshot. Membership alone does not prove origin, truth, or semantic support; diagnosis quality requires separate evaluation.
+
+## Diagnosis request flow
 
 1. Validate an incident snapshot containing logs, health observations, and deployment events.
 2. Send the bounded evidence to an LLM through a provider API.
 3. Validate the response structure and verify that cited evidence IDs exist in the input.
 4. Return a hypothesis or an insufficient-evidence outcome, together with supporting references and suggested checks.
 
-The initial inference provider is planned to be Groq, accessed through the OpenAI Python SDK. Provider-specific capabilities and limits must be validated during integration.
+diagnose_incident(incident, client, model) keeps trusted instructions in a system message and serializes the incident as JSON in a separate user message. This separation is covered by offline request-format tests; it is not proof that arbitrary prompt injection will be resisted. The application enforces output/reference rules independently and has no tool-execution capability at this stage.
+
+The serialized incident has a 12,000-byte UTF-8 budget; this is a data-size limit, not an exact token count or full HTTP request-size limit. The completion budget is 1,024 tokens. The function sets SDK retries to zero and uses the configured transport timeout for each request. It does not retry or repair malformed outputs. Refusals, truncation, missing content, unsupported tool responses, invalid Diagnosis payloads, and unknown citations raise DiagnosisError. Empty model configuration raises ConfigurationError. Provider/network failures remain SDK exceptions rather than becoming an insufficient-evidence diagnosis.
+
+The initial inference provider is Groq, accessed through the OpenAI Python SDK. llm.py creates a client with the fixed Groq endpoint, an explicit SDK timeout, and no automatic retries. smoke.py requests one tiny strict JSON object, checks completion/refusal/content, and emits credential-free metadata. Runtime configuration comes from process environment variables or an explicitly supplied local file; application code does not assume the repository working directory to find secrets.
+
+The default model is openai/gpt-oss-20b, listed by Groq for strict structured output. One live request verified access and the connectivity response schema; future environments must run their own check. Provider timeouts/rate limits/authentication errors are separate from output-validation failures. The timeout is an SDK transport setting, not a hard wall-clock deadline. Documentation: [Groq compatibility](https://console.groq.com/docs/openai), [Structured Outputs](https://console.groq.com/docs/structured-outputs).
+
+## CLI and local records
+
+The installed `incidentclue diagnose` command in cli.py owns argument parsing, explicit file/configuration loading, bounded UTF-8 input, error-to-exit-code mapping, and terminal output. It calls diagnose_incident without duplicating its request or validation logic. InputLimitError specializes DiagnosisError so oversized incident data maps to an input error. Accepted insufficient-evidence results are successful executions; provider failures remain failures.
+
+The command prints only Diagnosis JSON to stdout and uses stderr for errors and record locations. Optional records contain UUID run identifiers, actual configuration and hashes, processing duration, and the validated result or sanitized failure. records.py writes them with exclusive creation; filenames do not derive from untrusted incident identifiers. Record-directory preparation precedes inference, but a later write failure returns exit code 3 even if a diagnosis was printed. Local JSON records are not transactional audit storage. Credentials/raw evidence/raw provider errors are omitted; diagnosis text and input identifiers may still be sensitive. Provider usage/response identifiers are null because the core function currently returns only Diagnosis.
+
+## Read-only investigation graph
+
+investigation.py defines a LangGraph StateGraph with decide, execute, diagnose, and validate nodes. Conditional edges return to decision after the first lookup or route directly to diagnosis after two attempts. Counters enforce at most two tool attempts, two selection requests, and one final request; a recursion guard is secondary. Clients remain outside state. Input, tool arguments, scope, output, and citation checks reuse existing code. No automatic retries, checkpoint/resume, or persistent graph memory are configured.
+
+State keeps the original input, merged evidence, bounded tool history/conversation, counts, pending call, stop reason, and final result. Custom reducers skip identical evidence, reject conflicting IDs, and bound tool history. Repeated validated requests (UTC-normalized for log windows) are not executed again; the graph returns a controlled tool error and diagnoses existing evidence. Provider failures remain errors. Tool-result exchanges carry matching call IDs; final generation offers no tools. See [graph design and boundaries](langgraph.md) and [actual graph run](validation/langgraph-2026-10-29.md).
 
 ## Component boundaries
 
@@ -53,8 +104,32 @@ flowchart LR
 
 The intended development path is a CLI over the investigation engine, then a FastAPI interface over the same engine, then a web client. A queue or persistent job API can be introduced if measured investigation duration requires asynchronous execution; it is not a prerequisite for the first request.
 
+## Continuous integration and packaging
+
+.github/workflows/ci.yml checks pushes and pull requests using a Linux/Python 3.12, Linux/Python 3.13, and Windows/Python 3.13 matrix. Dependencies and build/lint tools are pinned in the development snapshot. Ruff checks common error rules with an explicit backend configuration, independent of parent workspace configuration. Builds use the installed pinned backend without isolated dependency resolution, producing an sdist and then a wheel from that sdist. CI installs the wheel and runs dependency checks and offline tests against it. Installed CLI help is also tested from outside the checkout. backend/MANIFEST.in excludes checkout-dependent tests from the source distribution and includes dependency constraints; backend/README.md supplies package metadata documentation.
+
+The stable CI gate depends on the entire matrix and fails when any job fails, is skipped, or is cancelled. Workflow permissions are read-only; external actions are pinned by commit. No application secrets are supplied, and live inference is not part of the routine suite. CI performs package downloads; tests simulate provider responses rather than verifying Groq availability. A passing matrix covers the named OS/Python combinations, not all platforms or factual model behavior. Required status checks depend on actual repository branch-protection capability. Docker images, publishing, deployment, and rollback are later delivery stages.
+
+## Second tool: bounded logs
+
+Supplying --logs-file adds get_logs to the offered tools; omitting it preserves the health-only interface. The explicit dispatch allowlist maps names to separate Pydantic argument models. Log requests require the exact incident service and a positive timezone-aware time window no longer than one hour. Arguments never select a path, URL, shell command, or query language. The configured synthetic source is bounded to 64,000 file bytes and 20 unique log records, with 2,000 content characters per record.
+
+The log function filters timestamps inclusively and returns at most the five latest matches, sorted by timestamp and ID, with explicit truncation. Timezone offsets compare as instants. An empty successful result is not an outage observation; missing service data yields a structured unavailable error. Only successfully returned observations are merged into a copy of the incident for final reference validation. Original and fetched ID collisions fail explicitly. The final request offers no tools, and the graph bounds gathering to two lookup attempts before final generation. Offline tests cover either selection, scope, windows, truncation, hidden/out-of-window citations, failure handling, and record serialization; a [live log selection](validation/log-tool-2026-10-28.md) preserves the actual result and semantic limitations.
+
+## Container boundary
+
+The root compose.yaml adds a one-off CLI convenience service over the same image. It fixes read-only input/config mounts, a writable named output volume, and startup investigation defaults. Missing bind sources fail explicitly. Compose uses a separate named volume from previous manual runs, preserving both histories. The network mode defaults to bridge and is set to none in CI. The container job checks Compose configuration, offline help, controlled missing-key failure, and persisted records across separate containers. This adds no long-running service or model execution logic.
+
+backend/Dockerfile builds a backend wheel and downloads pinned runtime dependency wheels in a builder stage. A separate runtime stage installs only those wheels and runs the CLI as UID/GID 10001. The official Python base is pinned by a multi-platform manifest digest; runtime and development snapshots remain separate. The root .dockerignore allowlists backend packaging/source inputs, excluding environment files, fixtures, host caches, Git, and run output. Configuration/input files are explicitly mounted at execution time; a named output volume retains local records across disposable containers. See [container usage](containers.md).
+
+The CI container job verifies a Linux amd64 build, runtime identity, absent development tools, dependency compatibility, CLI startup, and mounted-input/error-record behavior with networking disabled. CI gate depends on both the Python matrix and container job. A container improves runtime repeatability but does not make stochastic model responses deterministic, provide live monitoring, prove cross-architecture compatibility, or deploy the app. Docker was not available in the implementation shell; actual container verification runs on GitHub's Linux runner. Image publishing and deployment are deferred until their destination and release policy are defined.
+
+## Evaluation boundary
+
+Synthetic incident files contain only model-visible incident fields. Expected statuses and review criteria live separately in evals/pilot-cases.json, which the CLI does not load. The initial three-case pilot and actual outputs are preserved in docs/validation/pilot-2026-10-28.md. Offline validation tests establish deterministic contract/error behavior; live manual review checks whether supplied observations support claims. Neither citation membership nor matching an expected status alone establishes diagnosis correctness.
+
 ## Evidence and execution boundaries
 
 Logs and retrieved content are untrusted input. Valid response structure and resolvable evidence IDs do not establish that a diagnosis is correct; evidence support requires separate evaluation. Expected root-cause labels must remain separate from model-visible incident snapshots.
 
-Initial diagnostic tools will be read-only. Any future state-changing action must require application-enforced authorization and explicit human approval.
+The initial health tool is read-only. Any future state-changing action must require application-enforced authorization and explicit human approval.

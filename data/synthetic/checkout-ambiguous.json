@@ -1,0 +1,25 @@
+{
+  "incident_id": "checkout-002",
+  "service": "checkout",
+  "summary": "Checkout requests are failing after a recent deployment.",
+  "evidence": [
+    {
+      "id": "E1",
+      "timestamp": "2026-10-28T03:00:00Z",
+      "kind": "deployment",
+      "content": "Checkout version 3 deployed. Deployment completed successfully."
+    },
+    {
+      "id": "E2",
+      "timestamp": "2026-10-28T03:04:00Z",
+      "kind": "health",
+      "content": "Checkout health endpoint returns HTTP 503. No component-level failure details are included."
+    },
+    {
+      "id": "E3",
+      "timestamp": "2026-10-28T03:05:00Z",
+      "kind": "log",
+      "content": "Checkout request failed with a timeout. The log does not identify the timed-out operation or dependency."
+    }
+  ]
+}

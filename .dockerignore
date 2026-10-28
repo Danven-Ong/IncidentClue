@@ -1,0 +1,13 @@
+# Allow only the backend build inputs into the build context.
+**
+!backend/
+!backend/Dockerfile
+!backend/pyproject.toml
+!backend/README.md
+!backend/MANIFEST.in
+!backend/requirements-dev.lock.txt
+!backend/requirements-runtime.lock.txt
+!backend/src/
+!backend/src/incidentclue/
+!backend/src/incidentclue/*.py
+!.dockerignore
