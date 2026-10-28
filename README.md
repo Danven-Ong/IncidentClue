@@ -6,7 +6,7 @@ IncidentClue is designed to analyze logs, service health, and deployment events,
 
 ## Status
 
-Early development. The backend validates incident snapshots, nested evidence, structured diagnosis output, and citation membership against the supplied incident. A Groq connectivity smoke command has passed offline transport tests and one live strict-JSON request. The diagnostic model request, investigation logic, incident CLI/API entry points, and web frontend are pending implementation.
+Early development. The backend can request a structured diagnosis for an incident through Groq, validate its business rules, and verify citation membership. One synthetic checkout incident has been diagnosed successfully. The incident CLI, HTTP API, web frontend, and broader diagnosis evaluation are pending implementation.
 
 ## Requirements
 
@@ -63,6 +63,35 @@ The client uses Groq's explicit API endpoint, a 20-second SDK timeout setting, z
 
 The [recorded live smoke check](docs/validation/groq-smoke-2026-10-28.json) on 28 October 2026 returned the expected JSON with openai/gpt-oss-20b. Its request latency was 1,520.11 ms and reported usage was 246 tokens. This is one observation of connectivity, not a performance or diagnosis-accuracy benchmark.
 
+## Diagnose an incident from Python
+
+From the repository root, after installing the backend and configuring .env, use the library function:
+
+```python
+import os
+from pathlib import Path
+
+from dotenv import load_dotenv
+
+from incidentclue.diagnosis import diagnose_incident
+from incidentclue.llm import DEFAULT_MODEL, create_groq_client
+from incidentclue.schemas import Incident
+
+load_dotenv(".env", override=False, encoding="utf-8-sig")
+incident = Incident.model_validate_json(
+    Path("data/synthetic/checkout.json").read_text(encoding="utf-8-sig")
+)
+with create_groq_client(os.environ["GROQ_API_KEY"]) as client:
+    result = diagnose_incident(
+        incident, client, os.environ.get("GROQ_MODEL", DEFAULT_MODEL)
+    )
+print(result.model_dump_json(indent=2))
+```
+
+The function sends one request with separate instructions and incident data, requests the Diagnosis JSON schema, then applies application consistency and citation checks. Serialized incident data is limited to 12,000 UTF-8 bytes, with a 1,024-token completion budget and automatic retries disabled. Oversized input, invalid output, and unknown references fail explicitly; provider errors remain SDK exceptions. Callers must handle these failures.
+
+The [first live checkout result](docs/validation/checkout-diagnosis-2026-10-28-a4391347.json) identified the missing PAYMENT_API_URL configuration using evidence E2. It passed structural/reference validation and an assistant review of the supplied observations; independent human review is pending. One synthetic case does not establish accuracy across incidents.
+
 ## Tests
 
 From the repository root, run the backend tests with the development environment's Python.
@@ -99,6 +128,7 @@ IncidentClue/
       test_diagnoses.py
       test_diagnosis_validation.py
       test_smoke.py
+      test_diagnosis_request.py
     pyproject.toml
     requirements-dev.lock.txt
   frontend/

@@ -1,0 +1,66 @@
+{
+  "check": "synthetic_incident_diagnosis",
+  "execution": "live",
+  "run_id": "a4391347-f479-45a2-a626-e7e5bcb4e109",
+  "started_at": "2026-10-28T11:59:08.670231+00:00",
+  "source_base_revision": "f1cc1ddbcd036931d7775ed21d21416cff941a4d",
+  "source_working_tree_dirty_at_execution": true,
+  "python_version": "3.13.5",
+  "sdk": {
+    "package": "openai",
+    "version": "3.40.0"
+  },
+  "input": {
+    "path": "data/synthetic/checkout.json",
+    "incident_id": "checkout-001",
+    "serialized_sha256": "d0b93cf4f62f8e2efbbb88d3f34bfa5417e1de5f0a1a75ee1a2e797adde08337",
+    "serialized_bytes": 523
+  },
+  "instructions_sha256": "62124486f1faeffa62834832750da396bc70084ca03250ad0bda66b291c0e275",
+  "configuration": {
+    "base_url": "https://api.groq.com/openai/v1",
+    "model": "openai/gpt-oss-20b",
+    "timeout_seconds": 20.0,
+    "max_retries": 0,
+    "max_incident_bytes": 12000,
+    "max_completion_tokens": 1024,
+    "response_format": "json_schema",
+    "strict": true
+  },
+  "manual_review": {
+    "status": "assistant_reviewed",
+    "reviewer": "assistant",
+    "human_review": "pending",
+    "assessment": "The immediate startup failure cause is supported by E2, which explicitly reports the missing required PAYMENT_API_URL variable.",
+    "observations": [
+      "The cited ID E2 exists in the supplied incident.",
+      "The response does not claim version 2 definitively introduced the missing variable.",
+      "Suggested checks are recommendations; no action was executed."
+    ],
+    "limitations": [
+      "Why the variable became missing has not been established.",
+      "The empty missing_evidence list could better acknowledge the absent deployment configuration and previous working configuration.",
+      "This single synthetic case is not evidence of general diagnosis accuracy."
+    ]
+  },
+  "limitations": [
+    "One synthetic case; not a diagnosis-accuracy or performance benchmark.",
+    "Schema and citation membership checks do not establish semantic support.",
+    "This stage does not capture provider response IDs or token usage."
+  ],
+  "outcome": "validated",
+  "diagnosis": {
+    "status": "hypothesis",
+    "probable_cause": "Missing required environment variable PAYMENT_API_URL caused checkout startup failure, leading to service unavailability.",
+    "evidence_ids": [
+      "E2"
+    ],
+    "missing_evidence": [],
+    "next_checks": [
+      "Verify that PAYMENT_API_URL is correctly set in the deployment environment",
+      "Confirm that the environment configuration is applied during startup",
+      "Check for any deployment scripts that may omit the variable"
+    ]
+  },
+  "elapsed_ms_including_validation": 1093.96
+}

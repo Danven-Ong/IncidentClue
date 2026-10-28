@@ -4,7 +4,7 @@ IncidentClue is designed as a web application with a modular Python backend. It 
 
 ## Current implementation
 
-The backend implements input/output models, a citation-membership guard, and a Groq connectivity smoke command. Offline tests exercise the installed SDK through a fake HTTP transport, and one live strict-JSON smoke request succeeded. The investigation pipeline and diagnostic request are pending; there is no incident CLI, HTTP API, frontend application, or database connection yet.
+The backend implements input/output models, a citation-membership guard, a Groq connectivity smoke command, and a single-request diagnose_incident function. Offline tests exercise the installed SDK through a fake HTTP transport. A connectivity smoke request and one real diagnosis of the synthetic checkout incident succeeded. The incident CLI, HTTP API, frontend, database, and broader evaluation remain pending.
 
 ## Incident input contract
 
@@ -33,18 +33,22 @@ All five fields must be supplied, including probable_cause when its value is nul
 
 An insufficient-evidence result may cite inconclusive observations without asserting a cause. Suggested checks are text only and do not authorize execution.
 
-The schema checks structure and cross-field consistency. The separate validate_evidence_references(incident, diagnosis) function in backend/src/incidentclue/diagnosis.py checks whether every cited ID exists in the explicitly supplied incident. Callers must run both schema validation and this guard before accepting a result; the guard is not invoked automatically by the schema.
+The schema checks structure and cross-field consistency. The separate validate_evidence_references(incident, diagnosis) function in backend/src/incidentclue/diagnosis.py checks whether every cited ID exists in the explicitly supplied incident. diagnose_incident performs both checks before returning a Diagnosis. Consumers that bypass that function must perform both themselves; the schema alone does not check incident-specific references.
 
 The guard uses exact, case-sensitive ID matching and raises ValueError listing unknown IDs in deterministic order. It checks citations even when the result is insufficient_evidence, accepts an empty citation list when that status permits it, and does not change either object. Its time complexity is linear in the number of input/cited IDs, plus sorting unknown IDs for the error message.
 
 An ID present only in a different incident fails this check. Because IDs may be reused across incidents, the caller must associate the result with the correct input snapshot. Membership alone does not prove origin, truth, or semantic support; diagnosis quality requires separate evaluation.
 
-## Proposed request flow
+## Diagnosis request flow
 
 1. Validate an incident snapshot containing logs, health observations, and deployment events.
 2. Send the bounded evidence to an LLM through a provider API.
 3. Validate the response structure and verify that cited evidence IDs exist in the input.
 4. Return a hypothesis or an insufficient-evidence outcome, together with supporting references and suggested checks.
+
+diagnose_incident(incident, client, model) keeps trusted instructions in a system message and serializes the incident as JSON in a separate user message. This separation is covered by offline request-format tests; it is not proof that arbitrary prompt injection will be resisted. The application enforces output/reference rules independently and has no tool-execution capability at this stage.
+
+The serialized incident has a 12,000-byte UTF-8 budget; this is a data-size limit, not an exact token count or full HTTP request-size limit. The completion budget is 1,024 tokens. The function sets SDK retries to zero and uses the configured transport timeout for each request. It does not retry or repair malformed outputs. Refusals, truncation, missing content, unsupported tool responses, invalid Diagnosis payloads, and unknown citations raise DiagnosisError. Empty model configuration raises ConfigurationError. Provider/network failures remain SDK exceptions rather than becoming an insufficient-evidence diagnosis.
 
 The initial inference provider is Groq, accessed through the OpenAI Python SDK. llm.py creates a client with the fixed Groq endpoint, an explicit SDK timeout, and no automatic retries. smoke.py requests one tiny strict JSON object, checks completion/refusal/content, and emits credential-free metadata. Runtime configuration comes from process environment variables or an explicitly supplied local file; application code does not assume the repository working directory to find secrets.
 
