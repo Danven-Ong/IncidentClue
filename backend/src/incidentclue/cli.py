@@ -32,7 +32,7 @@ from incidentclue.records import write_run_record
 from incidentclue.schemas import Incident
 from incidentclue.investigation import (
     FINAL_INSTRUCTIONS, MAX_MODEL_REQUESTS, MAX_SELECTION_TOKENS, MAX_TOOL_CALLS,
-    TOOL_INSTRUCTIONS, investigate_incident,
+    GRAPH_RECURSION_LIMIT, TOOL_INSTRUCTIONS, investigate_incident,
 )
 from incidentclue.tools import load_health_snapshot, load_log_snapshot
 
@@ -126,6 +126,10 @@ def main(argv: list[str] | None = None) -> int:
     exit_code = 0
     if args.command == "investigate":
         record["mode"] = "investigate"
+        record["orchestration"] = "langgraph"
+        record["langgraph_version"] = version("langgraph")
+        record["graph_steps"] = []
+        record["graph_summary"] = {}
         record["instructions_sha256"] = hashlib.sha256(
             FINAL_INSTRUCTIONS.encode("utf-8")
         ).hexdigest()
@@ -135,6 +139,7 @@ def main(argv: list[str] | None = None) -> int:
         record["request_policy"].update({
             "max_model_requests": MAX_MODEL_REQUESTS, "max_tool_calls": MAX_TOOL_CALLS,
             "max_selection_tokens": MAX_SELECTION_TOKENS,
+            "graph_recursion_limit": GRAPH_RECURSION_LIMIT,
         })
         record["tool_events"] = []
 
@@ -187,6 +192,7 @@ def main(argv: list[str] | None = None) -> int:
             else:
                 result = investigate_incident(
                     incident, client, snapshot, model, events=record["tool_events"], logs=logs,
+                    steps=record["graph_steps"], summary=record["graph_summary"],
                 )
         record["outcome"] = "success"
         record["diagnosis"] = result.model_dump(mode="json")

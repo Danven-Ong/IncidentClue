@@ -83,11 +83,11 @@ def test_tool_result_reaches_final_request_and_citations_use_fetched_evidence(
 ):
     before = incident.model_dump()
     requests, events = [], []
-    with fake_client([selection, final], requests) as client:
+    with fake_client([selection, completion({"content": "Enough evidence."}), final], requests) as client:
         result = investigation.investigate_incident(incident, client, health, events=events)
     assert result.evidence_ids == ["H1"]
     assert incident.model_dump() == before
-    first, second = requests
+    first, _, second = requests
     assert first["tool_choice"] == "auto"
     assert first["parallel_tool_calls"] is False
     assert first["tools"][0]["function"]["name"] == "get_service_health"
@@ -151,7 +151,7 @@ def test_tool_failure_is_not_health_evidence(incident, health, selection, failur
             raise OSError("Private backend detail")
         monkeypatch.setattr(investigation, "get_service_health", fail)
     requests, events = [], []
-    with fake_client([selection, abstention()], requests) as client:
+    with fake_client([selection, completion({"content": "Enough evidence."}), abstention()], requests) as client:
         result = investigation.investigate_incident(incident, client, health, events=events)
     assert result.probable_cause is None
     assert events[0]["result"]["status"] == "error"
@@ -161,13 +161,13 @@ def test_tool_failure_is_not_health_evidence(incident, health, selection, failur
 
 def test_cannot_cite_unreturned_tool_observations(incident, health, selection, final):
     health.evidence = []
-    with fake_client([selection, final], []) as client, pytest.raises(DiagnosisError, match="outside"):
+    with fake_client([selection, completion({"content": "Enough evidence."}), final], []) as client, pytest.raises(DiagnosisError, match="outside"):
         investigation.investigate_incident(incident, client, health)
 
 
 def test_tool_evidence_id_collision_rejected(incident, health, selection):
-    incident.evidence = health.evidence.copy()
-    with fake_client([selection], []) as client, pytest.raises(DiagnosisError, match="collide"):
+    incident.evidence = [health.evidence[0].model_copy(update={"content": "Conflicting observation."})]
+    with fake_client([selection], []) as client, pytest.raises(DiagnosisError, match="Conflicting"):
         investigation.investigate_incident(incident, client, health)
 
 
@@ -230,9 +230,9 @@ def test_health_snapshot_rejects_logs(health):
 
 def test_final_cannot_request_another_tool(incident, health, selection):
     requests = []
-    with fake_client([selection, selection], requests) as client, pytest.raises(DiagnosisError):
+    with fake_client([selection, completion({"content": "Enough evidence."}), selection], requests) as client, pytest.raises(DiagnosisError):
         investigation.investigate_incident(incident, client, health)
-    assert len(requests) == 2
+    assert len(requests) == 3
 
 
 def test_investigate_cli_records_tool_evidence_and_prints_diagnosis(
@@ -244,7 +244,7 @@ def test_investigate_cli_records_tool_evidence_and_prints_diagnosis(
     incident_path.write_text(incident.model_dump_json())
     health_path.write_text(health.model_dump_json())
     requests = []
-    monkeypatch.setattr(cli, "create_groq_client", lambda key: fake_client([selection, final], requests))
+    monkeypatch.setattr(cli, "create_groq_client", lambda key: fake_client([selection, completion({"content": "Enough evidence."}), final], requests))
     record_dir = tmp_path / "runs"
     assert cli.main([
         "investigate", str(incident_path), "--health-file", str(health_path),
@@ -253,8 +253,8 @@ def test_investigate_cli_records_tool_evidence_and_prints_diagnosis(
     assert json.loads(capsys.readouterr().out)["evidence_ids"] == ["H1"]
     record = json.loads(next(record_dir.glob("*.json")).read_text())
     assert record["tool_events"][0]["result"]["evidence"][0]["id"] == "H1"
-    assert record["request_policy"]["max_model_requests"] == 2
-    assert record["request_policy"]["max_tool_calls"] == 1
+    assert record["request_policy"]["max_model_requests"] == 3
+    assert record["request_policy"]["max_tool_calls"] == 2
     assert record["health_snapshot"]["serialized_sha256"]
     assert record["selection_instructions_sha256"]
 
@@ -295,6 +295,7 @@ def logs():
 
 @pytest.fixture
 def log_selection(selection):
+    selection = deepcopy(selection)
     function = selection["choices"][0]["message"]["tool_calls"][0]["function"]
     function["name"] = "get_logs"
     function["arguments"] = json.dumps({
@@ -306,6 +307,7 @@ def log_selection(selection):
 
 @pytest.fixture
 def log_final(final):
+    final = deepcopy(final)
     payload = json.loads(final["choices"][0]["message"]["content"])
     payload["evidence_ids"] = ["L2"]
     final["choices"][0]["message"]["content"] = json.dumps(payload)
@@ -316,7 +318,7 @@ def test_logs_selected_from_two_tools_and_returned_as_citable_evidence(
     incident, health, logs, log_selection, log_final,
 ):
     requests, events = [], []
-    with fake_client([log_selection, log_final], requests) as client:
+    with fake_client([log_selection, completion({"content": "Enough evidence."}), log_final], requests) as client:
         result = investigation.investigate_incident(incident, client, health, logs=logs, events=events)
     assert result.evidence_ids == ["L2"]
     assert {tool["function"]["name"] for tool in requests[0]["tools"]} == {"get_logs", "get_service_health"}
@@ -328,7 +330,7 @@ def test_logs_selected_from_two_tools_and_returned_as_citable_evidence(
 
 
 def test_health_can_still_be_selected_when_logs_offered(incident, health, logs, selection, final):
-    with fake_client([selection, final], []) as client:
+    with fake_client([selection, completion({"content": "Enough evidence."}), final], []) as client:
         assert investigation.investigate_incident(incident, client, health, logs=logs).evidence_ids == ["H1"]
 
 
@@ -341,7 +343,7 @@ def test_cannot_cite_logs_outside_returned_window(incident, health, logs, log_se
     payload = json.loads(log_final["choices"][0]["message"]["content"])
     payload["evidence_ids"] = ["L0"]
     log_final["choices"][0]["message"]["content"] = json.dumps(payload)
-    with fake_client([log_selection, log_final], []) as client, pytest.raises(DiagnosisError, match="outside"):
+    with fake_client([log_selection, completion({"content": "Enough evidence."}), log_final], []) as client, pytest.raises(DiagnosisError, match="outside"):
         investigation.investigate_incident(incident, client, health, logs=logs)
 
 
@@ -357,7 +359,7 @@ def test_log_backend_error_is_sanitized_and_allows_abstention(incident, health, 
         raise OSError("Private log backend detail")
     monkeypatch.setattr(investigation, "get_logs", fail)
     events = []
-    with fake_client([log_selection, abstention()], []) as client:
+    with fake_client([log_selection, completion({"content": "Enough evidence."}), abstention()], []) as client:
         result = investigation.investigate_incident(incident, client, health, logs=logs, events=events)
     assert result.status == "insufficient_evidence"
     assert events[0]["result"] == {"status": "error", "error": "logs_unavailable", "evidence": []}
@@ -368,7 +370,7 @@ def test_cli_enables_and_records_log_source(tmp_path, incident, health, logs, lo
     incident_path, health_path, logs_path = [tmp_path / name for name in ("incident.json", "health.json", "logs.json")]
     for path, value in ((incident_path, incident), (health_path, health), (logs_path, logs)):
         path.write_text(value.model_dump_json())
-    monkeypatch.setattr(cli, "create_groq_client", lambda key: fake_client([log_selection, log_final], []))
+    monkeypatch.setattr(cli, "create_groq_client", lambda key: fake_client([log_selection, completion({"content": "Enough evidence."}), log_final], []))
     assert cli.main([
         "investigate", str(incident_path), "--health-file", str(health_path),
         "--logs-file", str(logs_path), "--record-dir", str(tmp_path / "runs"),
@@ -390,3 +392,123 @@ def test_cli_invalid_log_source_fails_before_provider(tmp_path, incident, health
         "--logs-file", str(tmp_path / "missing.json"),
     ]) == 2
     assert "synthetic log snapshot" in capsys.readouterr().err
+
+
+def test_graph_runs_two_lookups_then_routes_directly_to_final(
+    incident, health, logs, selection, log_selection, log_final,
+):
+    log_selection["choices"][0]["message"]["tool_calls"][0]["id"] = "call-logs"
+    requests, events, steps, summary = [], [], [], {}
+    with fake_client([selection, log_selection, log_final], requests) as client:
+        result = investigation.investigate_incident(
+            incident, client, health, logs=logs, events=events, steps=steps, summary=summary,
+        )
+    assert result.evidence_ids == ["L2"]
+    assert steps == ["decide", "execute", "decide", "execute", "diagnose", "validate"]
+    assert summary == {"tool_calls_used": 2, "model_requests_used": 3,
+                       "stop_reason": "tool_budget_exhausted"}
+    assert [item["name"] for item in events] == ["get_service_health", "get_logs"]
+    assert "tools" not in requests[-1]
+    assert "H1" in json.dumps(requests[1])
+    assert "L2" in json.dumps(requests[-1])
+
+
+def test_repeat_lookup_stops_without_second_execution(incident, health, selection, final, monkeypatch):
+    duplicate = deepcopy(selection)
+    duplicate["choices"][0]["message"]["tool_calls"][0]["id"] = "call-repeat"
+    executed = []
+    original = investigation.get_service_health
+    def track(*args, **kwargs):
+        executed.append(1)
+        return original(*args, **kwargs)
+    monkeypatch.setattr(investigation, "get_service_health", track)
+    requests, events, summary = [], [], {}
+    with fake_client([selection, duplicate, final], requests) as client:
+        result = investigation.investigate_incident(incident, client, health, events=events, summary=summary)
+    assert result.evidence_ids == ["H1"]
+    assert len(executed) == 1
+    assert summary["stop_reason"] == "repeated_request"
+    assert summary["tool_calls_used"] == 1
+    assert events[-1]["reason"] == "repeated_request"
+    last_reply = [item for item in requests[-1]["messages"] if item["role"] == "tool"][-1]
+    assert json.loads(last_reply["content"])["error"] == "repeated_request"
+
+
+def test_equivalent_timezone_queries_are_duplicates(incident, health, logs, log_selection, log_final):
+    duplicate = deepcopy(log_selection)
+    call = duplicate["choices"][0]["message"]["tool_calls"][0]
+    call["id"] = "call-equivalent"
+    call["function"]["arguments"] = json.dumps({
+        "end_time": "2026-10-28T10:05:00+08:00", "service": "checkout",
+        "start_time": "2026-10-28T10:00:00+08:00",
+    })
+    events, summary = [], {}
+    with fake_client([log_selection, duplicate, log_final], []) as client:
+        investigation.investigate_incident(incident, client, health, logs=logs, events=events, summary=summary)
+    assert summary["tool_calls_used"] == 1
+    assert summary["stop_reason"] == "repeated_request"
+
+
+def test_identical_evidence_is_not_appended_again(incident, health, selection, final):
+    incident.evidence = [item.model_copy(deep=True) for item in health.evidence]
+    with fake_client([selection, completion({"content": "Enough."}), final], []) as client:
+        graph = investigation.build_investigation_graph(client, health)
+        state = graph.invoke({
+            "incident": incident, "evidence": incident.evidence, "tool_history": [],
+            "messages": [{"role": "user", "content": incident.model_dump_json()}],
+            "tool_calls_used": 0, "model_requests_used": 0, "pending_call": None,
+            "stop_reason": "",
+        })
+    assert [item.id for item in state["evidence"]] == ["H1"]
+    assert state["tool_calls_used"] == 1
+
+
+def test_merge_reducer_preserves_inputs_and_rejects_conflicts(health):
+    item = health.evidence[0]
+    original = [item]
+    assert investigation.merge_evidence(original, [item.model_copy()]) == original
+    assert len(original) == 1
+    with pytest.raises(DiagnosisError, match="Conflicting"):
+        investigation.merge_evidence(original, [item.model_copy(update={"content": "Other fact."})])
+
+
+def test_tool_history_reducer_caps_growth():
+    original = [{"name": "one"}]
+    result = investigation.append_tool_history(original, [{"name": "two"}])
+    assert len(original) == 1 and len(result) == 2
+    with pytest.raises(DiagnosisError, match="history budget"):
+        investigation.append_tool_history(result, [{"name": "three"}])
+
+
+def test_same_call_id_cannot_be_reused(incident, health, selection):
+    with fake_client([selection, selection], []) as client, pytest.raises(DiagnosisError, match="reused"):
+        investigation.investigate_incident(incident, client, health)
+
+
+def test_final_invalid_citation_fails_in_validate_node(incident, health, selection, final):
+    payload = json.loads(final["choices"][0]["message"]["content"])
+    payload["evidence_ids"] = ["invented"]
+    final["choices"][0]["message"]["content"] = json.dumps(payload)
+    steps = []
+    with fake_client([selection, completion({"content": "Enough."}), final], []) as client, pytest.raises(DiagnosisError, match="outside"):
+        investigation.investigate_incident(incident, client, health, steps=steps)
+    assert steps[-2:] == ["diagnose", "validate"]
+
+
+def test_second_lookup_failure_retains_first_evidence(incident, health, logs, selection, log_selection, final, monkeypatch):
+    log_selection["choices"][0]["message"]["tool_calls"][0]["id"] = "call-logs"
+    def fail(*args, **kwargs):
+        raise OSError("Private detail")
+    monkeypatch.setattr(investigation, "get_logs", fail)
+    events = []
+    with fake_client([selection, log_selection, final], []) as client:
+        result = investigation.investigate_incident(incident, client, health, logs=logs, events=events)
+    assert result.evidence_ids == ["H1"]
+    assert events[1]["result"]["status"] == "error"
+
+
+def test_compiled_graph_has_expected_nodes_and_no_checkpointer(health):
+    with fake_client([], []) as client:
+        graph = investigation.build_investigation_graph(client, health)
+    assert set(graph.get_graph().nodes) == {"__start__", "decide", "execute", "diagnose", "validate", "__end__"}
+    assert graph.checkpointer is None

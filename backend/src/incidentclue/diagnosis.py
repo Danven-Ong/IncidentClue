@@ -72,6 +72,14 @@ def _request_diagnosis(
     incident: Incident, client: OpenAI, model: str, messages: list[dict]
 ) -> Diagnosis:
     """Shared final-response validation for supplied and tool-enriched evidence."""
+    content = _request_diagnosis_content(incident, client, model, messages)
+    return _validate_diagnosis(incident, content)
+
+
+def _request_diagnosis_content(
+    incident: Incident, client: OpenAI, model: str, messages: list[dict]
+) -> str:
+    """Request complete JSON content; callers must validate before accepting it."""
     if not model.strip():
         raise ConfigurationError("The diagnosis model must not be blank.")
 
@@ -107,7 +115,11 @@ def _request_diagnosis(
     content = choice.message.content
     if not isinstance(content, str) or not content:
         raise DiagnosisError("Provider returned no diagnosis content.")
+    return content
 
+
+def _validate_diagnosis(incident: Incident, content: str) -> Diagnosis:
+    """Validate structure, business invariants, and incident-specific references."""
     try:
         diagnosis = Diagnosis.model_validate_json(content)
     except ValidationError as error:
