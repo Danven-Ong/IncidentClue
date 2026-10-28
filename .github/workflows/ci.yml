@@ -72,7 +72,7 @@ jobs:
         with:
           persist-credentials: false
       - name: Build runtime image
-        run: docker build --file backend/Dockerfile --tag incidentclue:ci .
+        run: docker build --file backend/Dockerfile --tag incidentclue:ci --tag incidentclue:local .
       - name: Check installed commands without networking
         run: |
           docker run --rm --network none --read-only incidentclue:ci --help
@@ -103,6 +103,32 @@ jobs:
           test "$status" -eq 2
           [[ "$output" == *"Set GROQ_API_KEY"* ]]
           [[ "$output" == *"Run record:"* ]]
+
+      - name: Validate Compose and smoke commands offline
+        env:
+          INCIDENTCLUE_NETWORK_MODE: none
+        run: |
+          cp .env.example .env
+          docker compose config --quiet
+          docker compose run --rm --no-deps -T incidentclue --help
+          set +e
+          output=$(docker compose run --rm --no-deps -T incidentclue 2>&1)
+          status=$?
+          set -e
+          printf '%s\n' "$output"
+          test "$status" -eq 2
+          [[ "$output" == *"Set GROQ_API_KEY"* ]]
+          [[ "$output" == *"Run record:"* ]]
+          docker compose run --rm --no-deps -T --entrypoint python incidentclue -c '
+          import json
+          from pathlib import Path
+          records = list(Path("/app/runs").glob("*.json"))
+          assert records
+          record = json.loads(records[0].read_text())
+          assert record["outcome"] == "configuration_error"
+          assert record["exit_code"] == 2
+          assert record["log_snapshot"]["serialized_sha256"]
+          '
 
   gate:
     name: CI gate

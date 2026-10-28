@@ -144,6 +144,14 @@ The [first live checkout result](docs/validation/checkout-diagnosis-2026-10-28-a
 
 ## Docker
 
+With Docker Compose v2, the synthetic investigation can be built and run in one command from the repository root:
+
+```sh
+docker compose run --build --rm incidentclue
+```
+
+Configure the local ignored `.env` first. [compose.yaml](compose.yaml) supplies read-only synthetic inputs/configuration and a persistent `incidentclue-compose-runs` volume, plus default startup investigation arguments with both health and logs. Add `--help` for offline CLI help, or omit `--build` to reuse the image. See [Compose usage](docs/containers.md#compose-shortcut) for details. Existing manual Docker run records remain in their original volume.
+
 Build and run offline CLI help from the repository root:
 
 ```sh

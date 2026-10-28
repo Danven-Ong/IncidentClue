@@ -2,6 +2,35 @@
 
 Docker packages the Python runtime, installed application, and pinned runtime dependencies. It does not run the LLM locally: actual diagnosis still calls Groq. A working Docker Engine with Linux-container support is required; Windows users can use a suitable Docker Desktop setup.
 
+## Compose shortcut
+
+From the repository root, with Docker Engine and Docker Compose v2 available and the existing `.env` configured:
+
+```sh
+docker compose run --build --rm incidentclue
+```
+
+This builds the image, then runs the startup investigation with health and logs offered. Compose saves the build settings, read-only input/config mounts, writable output volume, and default CLI arguments in `compose.yaml`. The command works in Git Bash and PowerShell without manually passing container paths through the shell. It still calls Groq and requires a configured API key. If `.env` is missing, copy `.env.example` to `.env` and add the key; missing bind sources are rejected rather than silently created as directories.
+
+For offline CLI help, or subsequent runs without rebuilding:
+
+```sh
+docker compose run --build --rm incidentclue --help
+docker compose run --rm incidentclue
+```
+
+The help command does not call Groq, though building downloads images/packages and the configured mount files must exist. Rebuild when code/dependencies change; `--build` uses Docker's cache for unchanged layers. `run` is appropriate for this short-lived CLI. No long-running API or database service has been introduced.
+
+Compose records persist in the named volume `incidentclue-compose-runs`. Earlier manual `docker run` records remain in their separate `incidentclue-runs` volume; Compose does not migrate or delete them. List Compose records using the saved mounts:
+
+```sh
+docker compose run --rm --entrypoint ls incidentclue runs
+```
+
+The working directory is `/app`, so `runs` resolves to the output directory without passing an absolute container path through Git Bash. To inspect individual records, use Docker Desktop's volume viewer. Replacing default command arguments replaces the entire CLI argument list; supply all desired file/config/record flags for a custom investigation.
+
+The network mode defaults to `bridge` for Groq access. CI sets `INCIDENTCLUE_NETWORK_MODE=none`, uses a blank configuration template, and verifies default-command failure and persisted error records across separate Compose containers. Compose reads `.env` for its own interpolation; the key is not interpolated into the YAML or baked into the image. Application configuration is still loaded from the explicit mounted dotenv file. Avoid publishing resolved configurations or runtime records containing sensitive data.
+
 ## Build and offline smoke
 
 Run from the repository root:
@@ -76,4 +105,4 @@ The root `.dockerignore` allowlists only backend source and required packaging f
 
 CI builds and smokes the Linux image, verifies non-root execution and dependency compatibility, and tests mounted input/error-record writing with no credentials and `--network none`. The aggregate CI gate requires both the Python matrix and container job. This does not verify live Groq connectivity, Docker Desktop integration, or every CPU architecture. The initial CI image check targets the GitHub runner's Linux amd64 architecture. A manifest supporting other architectures is not evidence that all pinned Python wheels exist or have been tested there.
 
-Docker was unavailable in the implementation shell; use the linked Actions run for actual container verification and run the local commands on your Docker-equipped machine. Images are built for validation only; publishing, Compose, deployment, and rollback automation remain separate increments.
+Docker was unavailable in the implementation shell; use the linked Actions run for actual container verification and run the local commands on your Docker-equipped machine. Images are built for validation only; publishing, deployment, and rollback automation remain separate increments.
