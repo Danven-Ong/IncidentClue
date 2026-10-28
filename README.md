@@ -6,7 +6,7 @@ IncidentClue is designed to analyze logs, service health, and deployment events,
 
 ## Status
 
-Early development. The backend can request a structured diagnosis for an incident through Groq, validate its business rules, and verify citation membership. One synthetic checkout incident has been diagnosed successfully. The incident CLI, HTTP API, web frontend, and broader diagnosis evaluation are pending implementation.
+Early development. The diagnostic CLI loads an incident file, requests a structured diagnosis through Groq, validates business rules and citation membership, and optionally saves a local run record. One synthetic checkout incident has been diagnosed successfully through the CLI. The HTTP API, web frontend, and broader diagnosis evaluation remain pending.
 
 ## Requirements
 
@@ -62,6 +62,28 @@ The command sends a fixed connectivity prompt and checks for the strict JSON res
 The client uses Groq's explicit API endpoint, a 20-second SDK timeout setting, zero automatic retries, and a 512-token completion budget. Exit codes: 0 for a validated response, 1 for provider/response failure, and 2 for configuration errors. This check establishes connectivity/output behavior only; it is not a quality benchmark.
 
 The [recorded live smoke check](docs/validation/groq-smoke-2026-10-28.json) on 28 October 2026 returned the expected JSON with openai/gpt-oss-20b. Its request latency was 1,520.11 ms and reported usage was 246 tokens. This is one observation of connectivity, not a performance or diagnosis-accuracy benchmark.
+
+## Diagnose an incident
+
+From the repository root (PowerShell):
+
+```powershell
+.\.venv\Scripts\incidentclue.exe diagnose data/synthetic/checkout.json --env-file .env --record-dir runs
+```
+
+On macOS/Linux:
+
+```sh
+.venv/bin/incidentclue diagnose data/synthetic/checkout.json --env-file .env --record-dir runs
+```
+
+The equivalent module entry point is `python -m incidentclue.cli diagnose ...` using the installed environment's Python. Input paths are explicit. The command accepts UTF-8 JSON (including a UTF-8 BOM), limits the source file to 64,000 bytes, and applies the investigation's 12,000-byte serialized incident limit. Model selection follows `--model`, then `GROQ_MODEL`, then the default; existing process variables take precedence over values in the explicitly supplied environment file.
+
+Standard output contains only the validated Diagnosis JSON. Errors and the optional record path go to standard error. Exit codes are 0 for an accepted diagnosis (including insufficient evidence), 1 for provider or rejected-output failures, 2 for input/configuration errors, and 3 when the requested run record cannot be written. A record-write failure can occur after a successful diagnosis has already been printed.
+
+`--record-dir` is optional. Records use unique filenames and exclusive creation, preserving existing files. They include configuration, normalized input/instruction hashes, processing time, outcome, and the accepted diagnosis or a sanitized error. They omit credentials, raw incident contents, and raw provider errors. Incident identifiers and diagnosis text can still contain sensitive information: choose the directory accordingly. The default example directory `runs/` is ignored by Git. Records are local development artifacts, not crash-safe audit storage. Provider response IDs and usage are currently unavailable from the diagnosis function and are recorded as null. Processing time excludes writing the record and is not a hard request deadline.
+
+See the [recorded CLI checkout run](docs/validation/cli-checkout-2026-10-28-1cef626a.json) for one actual result and its review limitations.
 
 ## Diagnose an incident from Python
 
@@ -119,6 +141,8 @@ IncidentClue/
       __init__.py
       schemas.py
       diagnosis.py
+      cli.py
+      records.py
       llm.py
       smoke.py
     tests/
@@ -129,6 +153,7 @@ IncidentClue/
       test_diagnosis_validation.py
       test_smoke.py
       test_diagnosis_request.py
+      test_cli.py
     pyproject.toml
     requirements-dev.lock.txt
   frontend/
@@ -147,7 +172,7 @@ IncidentClue/
 
 [data/synthetic/checkout.json](data/synthetic/checkout.json) contains a checkout-service incident with deployment, log, and health observations. Every observation has a stable evidence ID and timestamp.
 
-The example is synthetic. A diagnostic command or API endpoint is not available yet. Shared examples stay at the repository root, independent of either application.
+The example is synthetic and can be supplied to the diagnostic command. An API endpoint is not available yet. Shared examples stay at the repository root, independent of either application.
 
 ## Application boundaries
 

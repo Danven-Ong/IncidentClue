@@ -27,7 +27,11 @@ Do not claim to have fetched evidence, executed tools, or performed remediation.
 
 
 class DiagnosisError(ValueError):
-    """An incident exceeds request limits or the provider result cannot be accepted."""
+    """An investigation cannot produce an accepted result."""
+
+
+class InputLimitError(DiagnosisError):
+    """A validated incident exceeds the provider request's input budget."""
 
 
 def validate_evidence_references(incident: Incident, diagnosis: Diagnosis) -> None:
@@ -60,7 +64,7 @@ def diagnose_incident(
 
     incident_json = incident.model_dump_json()
     if len(incident_json.encode("utf-8")) > MAX_INCIDENT_BYTES:
-        raise DiagnosisError(f"Incident exceeds the {MAX_INCIDENT_BYTES}-byte input limit.")
+        raise InputLimitError(f"Incident exceeds the {MAX_INCIDENT_BYTES}-byte input limit.")
 
     response = client.with_options(
         max_retries=0, timeout=REQUEST_TIMEOUT_SECONDS

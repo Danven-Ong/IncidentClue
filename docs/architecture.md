@@ -4,7 +4,7 @@ IncidentClue is designed as a web application with a modular Python backend. It 
 
 ## Current implementation
 
-The backend implements input/output models, a citation-membership guard, a Groq connectivity smoke command, and a single-request diagnose_incident function. Offline tests exercise the installed SDK through a fake HTTP transport. A connectivity smoke request and one real diagnosis of the synthetic checkout incident succeeded. The incident CLI, HTTP API, frontend, database, and broader evaluation remain pending.
+The backend implements input/output models, a citation-membership guard, a Groq connectivity smoke command, a single-request diagnose_incident function, and a diagnostic CLI with optional local run records. Offline tests exercise the installed SDK through a fake HTTP transport. Live connectivity and checkout diagnosis have succeeded, including through the installed CLI. The HTTP API, frontend, database, and broader evaluation remain pending.
 
 ## Incident input contract
 
@@ -53,6 +53,12 @@ The serialized incident has a 12,000-byte UTF-8 budget; this is a data-size limi
 The initial inference provider is Groq, accessed through the OpenAI Python SDK. llm.py creates a client with the fixed Groq endpoint, an explicit SDK timeout, and no automatic retries. smoke.py requests one tiny strict JSON object, checks completion/refusal/content, and emits credential-free metadata. Runtime configuration comes from process environment variables or an explicitly supplied local file; application code does not assume the repository working directory to find secrets.
 
 The default model is openai/gpt-oss-20b, listed by Groq for strict structured output. One live request verified access and the connectivity response schema; future environments must run their own check. Provider timeouts/rate limits/authentication errors are separate from output-validation failures. The timeout is an SDK transport setting, not a hard wall-clock deadline. Documentation: [Groq compatibility](https://console.groq.com/docs/openai), [Structured Outputs](https://console.groq.com/docs/structured-outputs).
+
+## CLI and local records
+
+The installed `incidentclue diagnose` command in cli.py owns argument parsing, explicit file/configuration loading, bounded UTF-8 input, error-to-exit-code mapping, and terminal output. It calls diagnose_incident without duplicating its request or validation logic. InputLimitError specializes DiagnosisError so oversized incident data maps to an input error. Accepted insufficient-evidence results are successful executions; provider failures remain failures.
+
+The command prints only Diagnosis JSON to stdout and uses stderr for errors and record locations. Optional records contain UUID run identifiers, actual configuration and hashes, processing duration, and the validated result or sanitized failure. records.py writes them with exclusive creation; filenames do not derive from untrusted incident identifiers. Record-directory preparation precedes inference, but a later write failure returns exit code 3 even if a diagnosis was printed. Local JSON records are not transactional audit storage. Credentials/raw evidence/raw provider errors are omitted; diagnosis text and input identifiers may still be sensitive. Provider usage/response identifiers are null because the core function currently returns only Diagnosis.
 
 ## Component boundaries
 
