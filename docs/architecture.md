@@ -4,7 +4,20 @@ IncidentClue is designed as a web application with a modular Python backend. It 
 
 ## Current implementation
 
-The repository contains backend package configuration and a synthetic incident example. frontend/ currently documents the web-client boundary only. The evidence models and investigation pipeline are pending implementation. There is no CLI, API, frontend application, model integration, or database connection yet.
+The backend implements Evidence and Incident input models. Validation tests cover accepted evidence kinds, timestamp parsing, required fields, invalid nested observations, and duplicate evidence IDs. The repository also contains package configuration and a synthetic incident example. frontend/ currently documents the web-client boundary only. Diagnosis output and the investigation pipeline are pending. There is no CLI, API, frontend application, model integration, or database connection yet.
+
+## Incident input contract
+
+| Field | Rule |
+| --- | --- |
+| incident_id | Required, nonempty string identifying the incident |
+| service | Required, nonempty string identifying the affected service |
+| summary | Required, nonempty description of the reported symptoms |
+| evidence | Required list of validated Evidence records; may be empty |
+
+Each Evidence record requires a nonempty id and content, a parseable timestamp, and a kind of deployment, log, or health. Evidence IDs must be unique within an incident so a citation identifies exactly one observation. Separate incidents may reuse the same evidence IDs; references therefore need the incident context.
+
+An explicitly empty list represents a snapshot with no observations. A missing or null evidence field is rejected as malformed input. Input validity does not establish the truth of observations or the cause of an incident.
 
 ## Proposed request flow
 

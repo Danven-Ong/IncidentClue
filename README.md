@@ -6,7 +6,7 @@ IncidentClue is designed to analyze logs, service health, and deployment events,
 
 ## Status
 
-Early development. The repository contains backend package configuration, a synthetic incident example, and technical documentation. Data models, model integration, investigation logic, CLI/API entry points, and the web frontend are pending implementation. Automated behavior tests have not been added yet.
+Early development. The backend validates incident snapshots and their nested evidence, with tests, package configuration, and a synthetic incident example. Diagnosis output, model integration, investigation logic, CLI/API entry points, and the web frontend are pending implementation.
 
 ## Requirements
 
@@ -39,6 +39,24 @@ macOS/Linux:
 
 The dependency snapshot pins the current development package versions. It does not include artifact hashes or guarantee compatibility across all Python versions and platforms.
 
+## Tests
+
+From the repository root, run the backend tests with the development environment's Python.
+
+Windows PowerShell:
+
+```powershell
+.\.venv\Scripts\python.exe -m pytest backend/tests
+```
+
+macOS/Linux:
+
+```sh
+.venv/bin/python -m pytest backend/tests
+```
+
+The input-model tests cover accepted observation types, timestamp parsing, required fields, nested validation, and unique evidence IDs within each incident. Empty evidence lists are accepted so the investigation pipeline can handle insufficient-evidence cases.
+
 ## Repository structure
 
 ```text
@@ -49,6 +67,8 @@ IncidentClue/
       schemas.py
     tests/
       conftest.py
+      test_schemas.py
+      test_incidents.py
     pyproject.toml
     requirements-dev.lock.txt
   frontend/
