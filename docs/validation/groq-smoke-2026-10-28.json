@@ -1,0 +1,46 @@
+{
+  "check": "provider_connectivity",
+  "execution": "live",
+  "source_base_revision": "adde153cf17d77752876088addbd1c861f0bbdb4",
+  "source_working_tree_dirty_at_execution": true,
+  "python_version": "3.13.5",
+  "sdk": {
+    "package": "openai",
+    "version": "3.40.0"
+  },
+  "configuration": {
+    "base_url": "https://api.groq.com/openai/v1",
+    "model": "openai/gpt-oss-20b",
+    "timeout_seconds": 20,
+    "max_retries": 0,
+    "max_completion_tokens": 512,
+    "response_format": "json_schema",
+    "strict": true
+  },
+  "result": {
+    "status": "ok",
+    "provider": "groq",
+    "requested_model": "openai/gpt-oss-20b",
+    "response_model": "openai/gpt-oss-20b",
+    "response_id": "chatcmpl-06110304-ef23-45c4-a258-ead33a23e03f",
+    "started_at": "2026-10-28T10:39:06.443708+00:00",
+    "request_latency_ms": 1520.11,
+    "usage": {
+      "completion_tokens": 65,
+      "prompt_tokens": 181,
+      "total_tokens": 246,
+      "completion_tokens_details": {
+        "reasoning_tokens": 46
+      },
+      "queue_time": 1.053802743,
+      "prompt_time": 0.01026406,
+      "completion_time": 0.071867684,
+      "total_time": 0.082131744
+    }
+  },
+  "limitations": [
+    "One live connectivity observation, not a latency benchmark.",
+    "The request sent no incident evidence and does not establish diagnosis quality.",
+    "The source changes were uncommitted during execution and are recorded alongside this artifact."
+  ]
+}

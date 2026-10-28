@@ -4,7 +4,7 @@ IncidentClue is designed as a web application with a modular Python backend. It 
 
 ## Current implementation
 
-The backend implements Evidence and Incident input models, a Diagnosis output model, and a citation-membership guard. Tests cover input validation, output consistency, and references absent from the supplied incident. The repository also contains package configuration and a synthetic incident example. frontend/ currently documents the web-client boundary only. The investigation pipeline is pending; there is no CLI, API, frontend application, model integration, or database connection yet.
+The backend implements input/output models, a citation-membership guard, and a Groq connectivity smoke command. Offline tests exercise the installed SDK through a fake HTTP transport, and one live strict-JSON smoke request succeeded. The investigation pipeline and diagnostic request are pending; there is no incident CLI, HTTP API, frontend application, or database connection yet.
 
 ## Incident input contract
 
@@ -46,7 +46,9 @@ An ID present only in a different incident fails this check. Because IDs may be 
 3. Validate the response structure and verify that cited evidence IDs exist in the input.
 4. Return a hypothesis or an insufficient-evidence outcome, together with supporting references and suggested checks.
 
-The initial inference provider is planned to be Groq, accessed through the OpenAI Python SDK. Provider-specific capabilities and limits must be validated during integration.
+The initial inference provider is Groq, accessed through the OpenAI Python SDK. llm.py creates a client with the fixed Groq endpoint, an explicit SDK timeout, and no automatic retries. smoke.py requests one tiny strict JSON object, checks completion/refusal/content, and emits credential-free metadata. Runtime configuration comes from process environment variables or an explicitly supplied local file; application code does not assume the repository working directory to find secrets.
+
+The default model is openai/gpt-oss-20b, listed by Groq for strict structured output. One live request verified access and the connectivity response schema; future environments must run their own check. Provider timeouts/rate limits/authentication errors are separate from output-validation failures. The timeout is an SDK transport setting, not a hard wall-clock deadline. Documentation: [Groq compatibility](https://console.groq.com/docs/openai), [Structured Outputs](https://console.groq.com/docs/structured-outputs).
 
 ## Component boundaries
 

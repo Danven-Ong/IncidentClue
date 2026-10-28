@@ -6,7 +6,7 @@ IncidentClue is designed to analyze logs, service health, and deployment events,
 
 ## Status
 
-Early development. The backend validates incident snapshots, nested evidence, structured diagnosis output, and citation membership against the supplied incident. Model integration, investigation logic, CLI/API entry points, and the web frontend are pending implementation.
+Early development. The backend validates incident snapshots, nested evidence, structured diagnosis output, and citation membership against the supplied incident. A Groq connectivity smoke command has passed offline transport tests and one live strict-JSON request. The diagnostic model request, investigation logic, incident CLI/API entry points, and web frontend are pending implementation.
 
 ## Requirements
 
@@ -39,6 +39,30 @@ macOS/Linux:
 
 The dependency snapshot pins the current development package versions. It does not include artifact hashes or guarantee compatibility across all Python versions and platforms.
 
+## Provider connectivity
+
+Create local configuration from the template (PowerShell):
+
+```powershell
+if (-not (Test-Path .env)) { Copy-Item .env.example .env }
+```
+
+Set GROQ_API_KEY in .env using a key from [Groq Console](https://console.groq.com/keys). The local .env file is ignored by Git; the template contains no credentials. GROQ_MODEL defaults to openai/gpt-oss-20b, subject to account access and current provider limits. Keep the account on the Free tier for the initial setup.
+
+From the repository root, run:
+
+```powershell
+.\.venv\Scripts\python.exe -m incidentclue.smoke --env-file .env
+```
+
+On macOS/Linux, use .venv/bin/python in place of the Windows executable path. Existing environment variables take precedence over file values. Omit --env-file when configuration is already in the process environment.
+
+The command sends a fixed connectivity prompt and checks for the strict JSON response {"status":"ok"}. It does not send incident data or perform a diagnosis. Success prints response/model identifiers, token usage when available, and observed request latency. Error output omits credentials and raw provider responses.
+
+The client uses Groq's explicit API endpoint, a 20-second SDK timeout setting, zero automatic retries, and a 512-token completion budget. Exit codes: 0 for a validated response, 1 for provider/response failure, and 2 for configuration errors. This check establishes connectivity/output behavior only; it is not a quality benchmark.
+
+The [recorded live smoke check](docs/validation/groq-smoke-2026-10-28.json) on 28 October 2026 returned the expected JSON with openai/gpt-oss-20b. Its request latency was 1,520.11 ms and reported usage was 246 tokens. This is one observation of connectivity, not a performance or diagnosis-accuracy benchmark.
+
 ## Tests
 
 From the repository root, run the backend tests with the development environment's Python.
@@ -66,12 +90,15 @@ IncidentClue/
       __init__.py
       schemas.py
       diagnosis.py
+      llm.py
+      smoke.py
     tests/
       conftest.py
       test_schemas.py
       test_incidents.py
       test_diagnoses.py
       test_diagnosis_validation.py
+      test_smoke.py
     pyproject.toml
     requirements-dev.lock.txt
   frontend/
@@ -82,6 +109,7 @@ IncidentClue/
   docs/
     architecture.md
   .gitignore
+  .env.example
   README.md
 ```
 

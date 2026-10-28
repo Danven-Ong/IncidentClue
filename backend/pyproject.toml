@@ -7,10 +7,14 @@ name = "incidentclue"
 version = "0.1.0"
 description = "Evidence-based investigation of software incidents."
 requires-python = ">=3.12"
-dependencies = ["pydantic>=2,<3"]
+dependencies = [
+    "openai>=3.40,<4",
+    "pydantic>=2,<3",
+    "python-dotenv>=1.2,<2",
+]
 
 [project.optional-dependencies]
-dev = ["pytest>=8,<10"]
+dev = ["httpx2>=2.16,<3", "pytest>=8,<10"]
 
 [tool.setuptools.packages.find]
 where = ["src"]
