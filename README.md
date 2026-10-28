@@ -134,6 +134,19 @@ The [first live checkout result](docs/validation/checkout-diagnosis-2026-10-28-a
 
 ## Tests
 
+The [CI workflow](.github/workflows/ci.yml) runs on every push and pull request, including draft PRs. It checks Linux with Python 3.12/3.13 and Windows with Python 3.13. Each job installs pinned dependencies, lints the backend, builds the source distribution and wheel, installs that wheel, checks dependencies, and runs the offline test suite. An additional smoke check runs the installed CLI outside the checkout. The stable `CI gate` check succeeds only when every matrix job succeeds. See [Actions runs](https://github.com/Danven-Ong/IncidentClue/actions) for actual results.
+
+CI uses no provider secrets and makes no intentional live LLM requests; model/provider interactions in tests use fake transports. Package downloads still require network access. Live synthetic evaluations are separate, deliberate runs. Workflow actions are pinned to commit SHAs, repository permissions are read-only, and checkout credentials are not persisted.
+
+To run lint and build locally with the installed development environment:
+
+```sh
+python -m ruff check --config backend/pyproject.toml backend
+python -m build --no-isolation backend
+```
+
+Use your virtual environment's Python. Building requires the pinned development/build tools. CI tests the installed wheel rather than an editable source install; source-distribution tests and fixtures remain in the full repository checkout. Passing CI is a prerequisite for review, not an automatic deployment or merge. Enforcing checks also requires branch protection supported by the repository's GitHub plan and configuration. Docker packaging and release publishing are separate future steps.
+
 From the repository root, run the backend tests with the development environment's Python.
 
 Windows PowerShell:

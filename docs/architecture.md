@@ -110,6 +110,12 @@ flowchart LR
 
 The intended development path is a CLI over the investigation engine, then a FastAPI interface over the same engine, then a web client. A queue or persistent job API can be introduced if measured investigation duration requires asynchronous execution; it is not a prerequisite for the first request.
 
+## Continuous integration and packaging
+
+.github/workflows/ci.yml checks pushes and pull requests using a Linux/Python 3.12, Linux/Python 3.13, and Windows/Python 3.13 matrix. Dependencies and build/lint tools are pinned in the development snapshot. Ruff checks common error rules with an explicit backend configuration, independent of parent workspace configuration. Builds use the installed pinned backend without isolated dependency resolution, producing an sdist and then a wheel from that sdist. CI installs the wheel and runs dependency checks and offline tests against it. Installed CLI help is also tested from outside the checkout. backend/MANIFEST.in excludes checkout-dependent tests from the source distribution and includes dependency constraints; backend/README.md supplies package metadata documentation.
+
+The stable CI gate depends on the entire matrix and fails when any job fails, is skipped, or is cancelled. Workflow permissions are read-only; external actions are pinned by commit. No application secrets are supplied, and live inference is not part of the routine suite. CI performs package downloads; tests simulate provider responses rather than verifying Groq availability. A passing matrix covers the named OS/Python combinations, not all platforms or factual model behavior. Required status checks depend on actual repository branch-protection capability. Docker images, publishing, deployment, and rollback are later delivery stages.
+
 ## Evaluation boundary
 
 Synthetic incident files contain only model-visible incident fields. Expected statuses and review criteria live separately in evals/pilot-cases.json, which the CLI does not load. The initial three-case pilot and actual outputs are preserved in docs/validation/pilot-2026-10-28.md. Offline validation tests establish deterministic contract/error behavior; live manual review checks whether supplied observations support claims. Neither citation membership nor matching an expected status alone establishes diagnosis correctness.

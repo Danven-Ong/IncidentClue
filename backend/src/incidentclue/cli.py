@@ -4,7 +4,6 @@ import argparse
 from datetime import datetime, timezone
 import hashlib
 from importlib.metadata import version
-import json
 import os
 from pathlib import Path
 import sys
