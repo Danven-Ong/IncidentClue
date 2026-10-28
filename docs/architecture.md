@@ -4,7 +4,7 @@ IncidentClue is designed as a web application with a modular Python backend. It 
 
 ## Current implementation
 
-The backend implements Evidence and Incident input models. Validation tests cover accepted evidence kinds, timestamp parsing, required fields, invalid nested observations, and duplicate evidence IDs. The repository also contains package configuration and a synthetic incident example. frontend/ currently documents the web-client boundary only. Diagnosis output and the investigation pipeline are pending. There is no CLI, API, frontend application, model integration, or database connection yet.
+The backend implements Evidence and Incident input models, a Diagnosis output model, and a citation-membership guard. Tests cover input validation, output consistency, and references absent from the supplied incident. The repository also contains package configuration and a synthetic incident example. frontend/ currently documents the web-client boundary only. The investigation pipeline is pending; there is no CLI, API, frontend application, model integration, or database connection yet.
 
 ## Incident input contract
 
@@ -18,6 +18,26 @@ The backend implements Evidence and Incident input models. Validation tests cove
 Each Evidence record requires a nonempty id and content, a parseable timestamp, and a kind of deployment, log, or health. Evidence IDs must be unique within an incident so a citation identifies exactly one observation. Separate incidents may reuse the same evidence IDs; references therefore need the incident context.
 
 An explicitly empty list represents a snapshot with no observations. A missing or null evidence field is rejected as malformed input. Input validity does not establish the truth of observations or the cause of an incident.
+
+## Diagnosis output contract
+
+All five fields must be supplied, including probable_cause when its value is null. Unexpected fields are rejected.
+
+| Field | Rule |
+| --- | --- |
+| status | hypothesis or insufficient_evidence |
+| probable_cause | Required string or null; a hypothesis requires nonblank text, while insufficient_evidence requires null |
+| evidence_ids | Required list of nonblank strings; a hypothesis requires at least one ID |
+| missing_evidence | Required list of strings identifying information still needed |
+| next_checks | Required list of strings describing suggested diagnostic checks |
+
+An insufficient-evidence result may cite inconclusive observations without asserting a cause. Suggested checks are text only and do not authorize execution.
+
+The schema checks structure and cross-field consistency. The separate validate_evidence_references(incident, diagnosis) function in backend/src/incidentclue/diagnosis.py checks whether every cited ID exists in the explicitly supplied incident. Callers must run both schema validation and this guard before accepting a result; the guard is not invoked automatically by the schema.
+
+The guard uses exact, case-sensitive ID matching and raises ValueError listing unknown IDs in deterministic order. It checks citations even when the result is insufficient_evidence, accepts an empty citation list when that status permits it, and does not change either object. Its time complexity is linear in the number of input/cited IDs, plus sorting unknown IDs for the error message.
+
+An ID present only in a different incident fails this check. Because IDs may be reused across incidents, the caller must associate the result with the correct input snapshot. Membership alone does not prove origin, truth, or semantic support; diagnosis quality requires separate evaluation.
 
 ## Proposed request flow
 
