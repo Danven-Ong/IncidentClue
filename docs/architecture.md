@@ -4,7 +4,7 @@ IncidentClue is designed as a web application with a modular Python backend. It 
 
 ## Current implementation
 
-The backend implements input/output models, a citation-membership guard, a Groq connectivity smoke command, a single-request diagnose_incident function, and a diagnostic CLI with optional local run records. Offline tests exercise the installed SDK through a fake HTTP transport. Live connectivity and checkout diagnosis have succeeded, including through the installed CLI. The HTTP API, frontend, database, and broader evaluation remain pending.
+The backend implements input/output models, a citation-membership guard, Groq connectivity, single-request diagnosis, and a bounded optional health-tool investigation. The CLI exposes both flows with local run records. Offline tests exercise the installed SDK through a fake HTTP transport. Live diagnosis and one tool-assisted investigation succeeded; semantic response limitations are recorded. The HTTP API, frontend, database, and broader evaluation remain pending.
 
 ## Incident input contract
 
@@ -60,6 +60,18 @@ The installed `incidentclue diagnose` command in cli.py owns argument parsing, e
 
 The command prints only Diagnosis JSON to stdout and uses stderr for errors and record locations. Optional records contain UUID run identifiers, actual configuration and hashes, processing duration, and the validated result or sanitized failure. records.py writes them with exclusive creation; filenames do not derive from untrusted incident identifiers. Record-directory preparation precedes inference, but a later write failure returns exit code 3 even if a diagnosis was printed. Local JSON records are not transactional audit storage. Credentials/raw evidence/raw provider errors are omitted; diagnosis text and input identifiers may still be sensitive. Provider usage/response identifiers are null because the core function currently returns only Diagnosis.
 
+## Read-only tool investigation
+
+investigation.py coordinates one tool-selection request with `tool_choice=auto`, at most one Python execution, and a separate final strict-schema request. tools.py defines the allowed health function, strict argument validation, bounded snapshot loading, and the incident-service scope. The model never chooses a filesystem path or arbitrary executable. There is no live probe, MCP server, LangChain integration, or recursive agent loop in this increment.
+
+The original incident is copied before enrichment. Successfully returned health observations become eligible evidence for final citation validation; errors never become observations. Duplicate IDs across original and fetched evidence fail explicitly. The model's assistant tool-call envelope and a matching `role=tool` result go to the final request, which offers no tools. The shared final-response helper in diagnosis.py retains completion, schema, consistency, and citation checks. Selection prose is not accepted as the final diagnosis.
+
+Tools and strict structured output use separate requests because of the provider's documented limitation. The application allows only one requested function call, regardless of provider parallel-call settings. Invalid requests stop rather than repairing; unavailable/unauthorized lookups return controlled error results and allow a diagnosis from remaining evidence. Provider errors propagate, with no automatic retries. Limits are two requests, one tool execution, bounded arguments and snapshot observations, and the normalized incident byte limit after enrichment. The limit does not cover the entire prompt; transport timeouts are not an overall deadline.
+
+Investigation records capture tool events (including returned observations), snapshot hash, and separate instruction hashes. Successful output does not imply all suggested actions are read-only: executable permissions are enforced by the dispatcher, while advice quality still needs review. The [live health-tool record](validation/health-tool-2026-10-28.md) demonstrates both a working request/result path and a textual restart suggestion that violated prompt guidance. The single-service check is a local application scope, not a production multi-user authorization system.
+
+Provider references: [local tool calling](https://console.groq.com/docs/tool-use/local-tool-calling), [structured-output limitations](https://console.groq.com/docs/structured-outputs), [OpenAI function-calling protocol](https://developers.openai.com/api/docs/guides/function-calling).
+
 ## Component boundaries
 
 | Location | Responsibility |
@@ -106,4 +118,4 @@ Synthetic incident files contain only model-visible incident fields. Expected st
 
 Logs and retrieved content are untrusted input. Valid response structure and resolvable evidence IDs do not establish that a diagnosis is correct; evidence support requires separate evaluation. Expected root-cause labels must remain separate from model-visible incident snapshots.
 
-Initial diagnostic tools will be read-only. Any future state-changing action must require application-enforced authorization and explicit human approval.
+The initial health tool is read-only. Any future state-changing action must require application-enforced authorization and explicit human approval.

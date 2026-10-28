@@ -1,0 +1,82 @@
+{
+  "record_version": 1,
+  "run_id": "601c60c0-c840-45d4-9a4a-7c1d86f45eae",
+  "started_at": "2026-10-28T13:58:35.035923+00:00",
+  "package_version": "0.1.0",
+  "sdk_version": "3.40.0",
+  "provider": "groq",
+  "requested_model": "openai/gpt-oss-20b",
+  "input": {
+    "file_name": "checkout-ambiguous.json",
+    "incident_id": "checkout-002",
+    "serialized_bytes": 620,
+    "serialized_sha256": "20a983214aced5fbd50197fe34f77f6f727af745384112cf84384886faae60aa"
+  },
+  "instructions_sha256": "5b07416b90ab64d02b045be7d9d30a78a8906c7f5e962f7df0e847e351df225d",
+  "request_policy": {
+    "max_file_bytes": 64000,
+    "max_incident_bytes": 12000,
+    "max_completion_tokens": 1024,
+    "timeout_seconds": 20.0,
+    "max_retries": 0,
+    "max_model_requests": 2,
+    "max_tool_calls": 1,
+    "max_selection_tokens": 512
+  },
+  "provider_response_id": null,
+  "provider_usage": null,
+  "mode": "investigate",
+  "selection_instructions_sha256": "3a542ccb4e5b4a76134eb3853ac45da6689a3e7e4fd9673461f6292b966ae145",
+  "tool_events": [
+    {
+      "tool_call_id": "fc_8f0439a6-c4e1-46ad-bc24-929793e1a2d4",
+      "name": "get_service_health",
+      "arguments": {
+        "service": "checkout"
+      },
+      "result": {
+        "status": "ok",
+        "service": "checkout",
+        "evidence": [
+          {
+            "id": "H1",
+            "timestamp": "2026-10-28T03:06:00Z",
+            "kind": "health",
+            "content": "Synthetic diagnostic health snapshot: checkout is not ready. Its readiness detail reports that required configuration PAYMENT_API_URL is missing."
+          }
+        ]
+      }
+    }
+  ],
+  "health_snapshot": {
+    "file_name": "checkout-health.json",
+    "serialized_sha256": "6be59d07594297d5744b6f06d19c415b4006e1fdfe886022bf3b6fd9cb770d32"
+  },
+  "outcome": "success",
+  "diagnosis": {
+    "status": "hypothesis",
+    "probable_cause": "Missing configuration PAYMENT_API_URL in the checkout service caused the service to be not ready, resulting in request timeouts and HTTP 503 responses.",
+    "evidence_ids": [
+      "E1",
+      "E2",
+      "E3",
+      "H1"
+    ],
+    "missing_evidence": [],
+    "next_checks": [
+      "Verify that PAYMENT_API_URL is correctly set in the checkout deployment configuration and that the service is restarted with the updated configuration."
+    ]
+  },
+  "elapsed_ms_processing": 2789.73,
+  "exit_code": 0,
+  "source": {
+    "base_commit": "cef8619806defc461106ada397a8507144d25152",
+    "working_tree_dirty": true,
+    "command": "incidentclue investigate data/synthetic/checkout-ambiguous.json --health-file data/synthetic/checkout-health.json --env-file .env --record-dir runs/tool-pilot-2026-10-28"
+  },
+  "review": {
+    "human": "pending",
+    "report": "health-tool-2026-10-28.md",
+    "assistant_summary": "Tool flow and citation membership verified. H1 supports a configuration hypothesis. Timeout causation is overstated; missing_evidence is empty and restart advice violates read-only-check guidance. No remediation executed."
+  }
+}

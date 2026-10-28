@@ -59,6 +59,19 @@ def diagnose_incident(
     The input byte budget bounds serialized incident data, not its exact token count.
     Invalid responses fail explicitly without a repair loop or automatic retry.
     """
+    return _request_diagnosis(
+        incident, client, model,
+        [
+            {"role": "system", "content": DIAGNOSIS_INSTRUCTIONS},
+            {"role": "user", "content": incident.model_dump_json()},
+        ],
+    )
+
+
+def _request_diagnosis(
+    incident: Incident, client: OpenAI, model: str, messages: list[dict]
+) -> Diagnosis:
+    """Shared final-response validation for supplied and tool-enriched evidence."""
     if not model.strip():
         raise ConfigurationError("The diagnosis model must not be blank.")
 
@@ -70,10 +83,7 @@ def diagnose_incident(
         max_retries=0, timeout=REQUEST_TIMEOUT_SECONDS
     ).chat.completions.create(
         model=model,
-        messages=[
-            {"role": "system", "content": DIAGNOSIS_INSTRUCTIONS},
-            {"role": "user", "content": incident_json},
-        ],
+        messages=messages,
         max_completion_tokens=MAX_DIAGNOSIS_TOKENS,
         response_format={
             "type": "json_schema",

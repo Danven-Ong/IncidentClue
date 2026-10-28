@@ -6,7 +6,7 @@ IncidentClue is designed to analyze logs, service health, and deployment events,
 
 ## Status
 
-Early development. The diagnostic CLI loads an incident file, requests a structured diagnosis through Groq, validates business rules and citation membership, and optionally saves a local run record. A three-case synthetic pilot produced a hypothesis for clear evidence and abstained for ambiguous and absent evidence. Human review and broader diagnosis evaluation remain pending, along with the HTTP API and web frontend.
+Early development. The CLI can diagnose supplied evidence or optionally gather one synthetic health observation through model-requested tool calling before diagnosis. Both paths validate business rules and citation membership and support local run records. A three-case synthetic pilot checked uncertainty, and one live tool-assisted investigation succeeded. Human review and broader evaluation remain pending, along with the HTTP API and web frontend.
 
 ## Requirements
 
@@ -87,6 +87,22 @@ See the [recorded CLI checkout run](docs/validation/cli-checkout-2026-10-28-1cef
 
 The [three-case pilot report](docs/validation/pilot-2026-10-28.md) preserves clear, ambiguous, and insufficient-evidence results, evaluator criteria, and limitations found in suggested checks. Expected outcomes live separately in `evals/pilot-cases.json` and are never included in incident inputs. Three synthetic examples do not establish general diagnosis accuracy.
 
+## Investigate with a read-only tool
+
+From the repository root in Git Bash (Windows):
+
+```bash
+./.venv/Scripts/incidentclue.exe investigate data/synthetic/checkout-ambiguous.json --health-file data/synthetic/checkout-health.json --env-file .env --record-dir runs
+```
+
+PowerShell uses `.\.venv\Scripts\incidentclue.exe`; macOS/Linux uses `.venv/bin/incidentclue`. The new command keeps the original incident separate from a recorded synthetic health snapshot. The first model request offers `get_service_health(service)` with automatic tool choice. If requested, Python validates the name and arguments, restricts the service to the incident service, and reads only the explicitly configured snapshot. No model-supplied path, URL, shell command, or arbitrary Python is executed. This is direct function calling, without MCP or an agent framework.
+
+There are at most two model requests and one tool execution: selection, then a separate strict-JSON diagnosis. Health results are returned with the tool-call ID, and final citation validation includes successfully fetched observations. The model may skip the lookup; then only original evidence is available. Unavailable/unauthorized service lookups return structured errors with no observations. Invalid tool names/arguments, multiple calls, or evidence ID collisions fail explicitly, without repairs or retries. The CLI uses the same exit codes as `diagnose`. An oversized enriched incident is an input error even if the first request has already completed.
+
+The health file is limited to 16,000 bytes, five health observations, and 2,000 characters of content per observation. The 12,000-byte incident budget also applies after enrichment; it does not measure the entire conversation or exact tokens. The two requests use separate 512-token selection and 1,024-token diagnosis budgets. Each has a 20-second SDK transport timeout; there is no hard overall deadline. The snapshot is timestamped test data, not current production monitoring.
+
+Investigation records additionally contain tool events and returned health evidence, plus a normalized health-snapshot hash and selection/final instruction hashes. These records can contain sensitive observation text; keep them local unless deliberately reviewed for publication. The model cannot execute state-changing tools, but textual suggestions can still violate instructions or overstate evidence. See the [actual tool run and review](docs/validation/health-tool-2026-10-28.md).
+
 ## Diagnose an incident from Python
 
 From the repository root, after installing the backend and configuring .env, use the library function:
@@ -143,6 +159,8 @@ IncidentClue/
       __init__.py
       schemas.py
       diagnosis.py
+      investigation.py
+      tools.py
       cli.py
       records.py
       llm.py
@@ -156,6 +174,7 @@ IncidentClue/
       test_smoke.py
       test_diagnosis_request.py
       test_cli.py
+      test_investigation.py
     pyproject.toml
     requirements-dev.lock.txt
   frontend/
@@ -165,6 +184,7 @@ IncidentClue/
       checkout.json
       checkout-ambiguous.json
       checkout-insufficient.json
+      checkout-health.json
   evals/
     pilot-cases.json
   docs/

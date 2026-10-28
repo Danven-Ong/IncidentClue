@@ -31,6 +31,11 @@ from incidentclue.llm import (
 )
 from incidentclue.records import write_run_record
 from incidentclue.schemas import Incident
+from incidentclue.investigation import (
+    FINAL_INSTRUCTIONS, MAX_MODEL_REQUESTS, MAX_SELECTION_TOKENS, MAX_TOOL_CALLS,
+    TOOL_INSTRUCTIONS, investigate_incident,
+)
+from incidentclue.tools import load_health_snapshot
 
 MAX_INPUT_FILE_BYTES = 64_000
 
@@ -76,11 +81,18 @@ def _load_environment(path: Path | None) -> None:
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     commands = parser.add_subparsers(dest="command", required=True)
-    diagnose = commands.add_parser("diagnose", help="Diagnose an incident JSON file.")
-    diagnose.add_argument("incident", type=Path)
-    diagnose.add_argument("--env-file", type=Path, help="Explicit local configuration file.")
-    diagnose.add_argument("--model", help="Override GROQ_MODEL for this investigation.")
-    diagnose.add_argument("--record-dir", type=Path, help="Write a local JSON run record.")
+    for name, help_text in (
+        ("diagnose", "Diagnose supplied incident evidence."),
+        ("investigate", "Optionally gather synthetic health evidence before diagnosis."),
+    ):
+        command = commands.add_parser(name, help=help_text)
+        command.add_argument("incident", type=Path)
+        command.add_argument("--env-file", type=Path, help="Explicit local configuration file.")
+        command.add_argument("--model", help="Override GROQ_MODEL for this investigation.")
+        command.add_argument("--record-dir", type=Path, help="Write a local JSON run record.")
+        if name == "investigate":
+            command.add_argument("--health-file", type=Path, required=True,
+                                 help="Explicit synthetic health snapshot; no live probes.")
     args = parser.parse_args(argv)
 
     started = perf_counter()
@@ -111,6 +123,19 @@ def main(argv: list[str] | None = None) -> int:
     result = None
     error_message = None
     exit_code = 0
+    if args.command == "investigate":
+        record["mode"] = "investigate"
+        record["instructions_sha256"] = hashlib.sha256(
+            FINAL_INSTRUCTIONS.encode("utf-8")
+        ).hexdigest()
+        record["selection_instructions_sha256"] = hashlib.sha256(
+            TOOL_INSTRUCTIONS.encode("utf-8")
+        ).hexdigest()
+        record["request_policy"].update({
+            "max_model_requests": MAX_MODEL_REQUESTS, "max_tool_calls": MAX_TOOL_CALLS,
+            "max_selection_tokens": MAX_SELECTION_TOKENS,
+        })
+        record["tool_events"] = []
 
     try:
         if args.record_dir is not None:
@@ -137,8 +162,22 @@ def main(argv: list[str] | None = None) -> int:
             "serialized_bytes": len(serialized),
             "serialized_sha256": hashlib.sha256(serialized).hexdigest(),
         }
+        snapshot = None
+        if args.command == "investigate":
+            snapshot = load_health_snapshot(args.health_file)
+            record["health_snapshot"] = {
+                "file_name": args.health_file.name,
+                "serialized_sha256": hashlib.sha256(
+                    snapshot.model_dump_json().encode("utf-8")
+                ).hexdigest(),
+            }
         with create_groq_client(os.environ.get("GROQ_API_KEY", "")) as client:
-            result = diagnose_incident(incident, client, model)
+            if snapshot is None:
+                result = diagnose_incident(incident, client, model)
+            else:
+                result = investigate_incident(
+                    incident, client, snapshot, model, events=record["tool_events"]
+                )
         record["outcome"] = "success"
         record["diagnosis"] = result.model_dump(mode="json")
     except (IncidentFileError, InputLimitError) as error:
