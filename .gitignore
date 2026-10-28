@@ -1,0 +1,64 @@
+# Python environments, caches, and build output
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+build/
+dist/
+
+# Frontend dependencies and generated output
+node_modules/
+.next/
+.nuxt/
+.output/
+.vite/
+*.tsbuildinfo
+coverage/
+
+# Secrets and local runtime output
+.env
+.env.*
+!.env.example
+*.log
+evals/results/
+
+# Coverage reports
+.coverage
+.coverage.*
+htmlcov/
+coverage.xml
+
+# Local editor and operating-system files
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+
+# Local agent instructions and configuration (any letter case)
+[Aa][Gg][Ee][Nn][Tt][Ss]*.[Mm][Dd]
+[Cc][Oo][Dd][Ee][Xx]*.[Mm][Dd]
+[Cc][Ll][Aa][Uu][Dd][Ee]*.[Mm][Dd]
+[Gg][Ee][Mm][Ii][Nn][Ii]*.[Mm][Dd]
+.agents/
+.codex/
+.claude/
+.cursor/
+.cursorrules
+.windsurf/
+.windsurfrules
+copilot-instructions.md
+.github/instructions/
+
+# Private learning and mentoring material
+learning/
+mentoring/
+.learning/
+[Ll][Ee][Aa][Rr][Nn][Ii][Nn][Gg].[Mm][Dd]
+[Pp][Rr][Oo][Gg][Rr][Ee][Ss][Ss].[Mm][Dd]
+[Rr][Oo][Aa][Dd][Mm][Aa][Pp].[Mm][Dd]
+[Cc][Oo][Uu][Rr][Ss][Ee][Ss].[Mm][Dd]
+interview-questions.md
