@@ -14,6 +14,7 @@ from incidentclue.llm import ConfigurationError, DEFAULT_MODEL, GROQ_BASE_URL
 from incidentclue.schemas import Incident
 from incidentclue.tools import (
     MAX_HEALTH_FILE_BYTES, HealthSnapshot, get_service_health, load_health_snapshot,
+    load_log_snapshot,
 )
 
 
@@ -285,3 +286,107 @@ def test_cli_rejected_tool_keeps_safe_trace(tmp_path, incident, health, selectio
     assert "private-unknown-tool" not in output.err
     record = json.loads(next((tmp_path / "runs").glob("*.json")).read_text())
     assert record["tool_events"] == [{"outcome": "rejected", "reason": "unknown_tool"}]
+
+
+@pytest.fixture
+def logs():
+    return load_log_snapshot(Path(__file__).resolve().parents[2] / "data/synthetic/checkout-logs.json")
+
+
+@pytest.fixture
+def log_selection(selection):
+    function = selection["choices"][0]["message"]["tool_calls"][0]["function"]
+    function["name"] = "get_logs"
+    function["arguments"] = json.dumps({
+        "service": "checkout", "start_time": "2026-10-28T02:00:00Z",
+        "end_time": "2026-10-28T02:05:00Z",
+    })
+    return selection
+
+
+@pytest.fixture
+def log_final(final):
+    payload = json.loads(final["choices"][0]["message"]["content"])
+    payload["evidence_ids"] = ["L2"]
+    final["choices"][0]["message"]["content"] = json.dumps(payload)
+    return final
+
+
+def test_logs_selected_from_two_tools_and_returned_as_citable_evidence(
+    incident, health, logs, log_selection, log_final,
+):
+    requests, events = [], []
+    with fake_client([log_selection, log_final], requests) as client:
+        result = investigation.investigate_incident(incident, client, health, logs=logs, events=events)
+    assert result.evidence_ids == ["L2"]
+    assert {tool["function"]["name"] for tool in requests[0]["tools"]} == {"get_logs", "get_service_health"}
+    assert "PAYMENT_API_URL" not in json.dumps(requests[0])
+    assert events[0]["name"] == "get_logs"
+    assert [item["id"] for item in events[0]["result"]["evidence"]] == ["L1", "L2"]
+    assert events[0]["arguments"]["start_time"].startswith("2026-10-28")
+    assert incident.evidence == []
+
+
+def test_health_can_still_be_selected_when_logs_offered(incident, health, logs, selection, final):
+    with fake_client([selection, final], []) as client:
+        assert investigation.investigate_incident(incident, client, health, logs=logs).evidence_ids == ["H1"]
+
+
+def test_unconfigured_log_tool_rejected(incident, health, log_selection):
+    with fake_client([log_selection], []) as client, pytest.raises(DiagnosisError, match="unsupported"):
+        investigation.investigate_incident(incident, client, health)
+
+
+def test_cannot_cite_logs_outside_returned_window(incident, health, logs, log_selection, log_final):
+    payload = json.loads(log_final["choices"][0]["message"]["content"])
+    payload["evidence_ids"] = ["L0"]
+    log_final["choices"][0]["message"]["content"] = json.dumps(payload)
+    with fake_client([log_selection, log_final], []) as client, pytest.raises(DiagnosisError, match="outside"):
+        investigation.investigate_incident(incident, client, health, logs=logs)
+
+
+def test_invalid_log_window_stops_before_execution(incident, health, logs, log_selection, monkeypatch):
+    log_selection["choices"][0]["message"]["tool_calls"][0]["function"]["arguments"] = '{"service":"checkout","start_time":"bad","end_time":"bad"}'
+    monkeypatch.setattr(investigation, "get_logs", lambda *a, **k: pytest.fail("executed"))
+    with fake_client([log_selection], []) as client, pytest.raises(DiagnosisError, match="invalid tool arguments"):
+        investigation.investigate_incident(incident, client, health, logs=logs)
+
+
+def test_log_backend_error_is_sanitized_and_allows_abstention(incident, health, logs, log_selection, monkeypatch):
+    def fail(*a, **k):
+        raise OSError("Private log backend detail")
+    monkeypatch.setattr(investigation, "get_logs", fail)
+    events = []
+    with fake_client([log_selection, abstention()], []) as client:
+        result = investigation.investigate_incident(incident, client, health, logs=logs, events=events)
+    assert result.status == "insufficient_evidence"
+    assert events[0]["result"] == {"status": "error", "error": "logs_unavailable", "evidence": []}
+
+
+def test_cli_enables_and_records_log_source(tmp_path, incident, health, logs, log_selection, log_final, monkeypatch, capsys):
+    from incidentclue import cli
+    incident_path, health_path, logs_path = [tmp_path / name for name in ("incident.json", "health.json", "logs.json")]
+    for path, value in ((incident_path, incident), (health_path, health), (logs_path, logs)):
+        path.write_text(value.model_dump_json())
+    monkeypatch.setattr(cli, "create_groq_client", lambda key: fake_client([log_selection, log_final], []))
+    assert cli.main([
+        "investigate", str(incident_path), "--health-file", str(health_path),
+        "--logs-file", str(logs_path), "--record-dir", str(tmp_path / "runs"),
+    ]) == 0
+    assert json.loads(capsys.readouterr().out)["evidence_ids"] == ["L2"]
+    record = json.loads(next((tmp_path / "runs").glob("*.json")).read_text())
+    assert record["log_snapshot"]["serialized_sha256"]
+    assert record["tool_events"][0]["name"] == "get_logs"
+
+
+def test_cli_invalid_log_source_fails_before_provider(tmp_path, incident, health, monkeypatch, capsys):
+    from incidentclue import cli
+    incident_path, health_path = tmp_path / "incident.json", tmp_path / "health.json"
+    incident_path.write_text(incident.model_dump_json())
+    health_path.write_text(health.model_dump_json())
+    monkeypatch.setattr(cli, "create_groq_client", lambda key: pytest.fail("client created"))
+    assert cli.main([
+        "investigate", str(incident_path), "--health-file", str(health_path),
+        "--logs-file", str(tmp_path / "missing.json"),
+    ]) == 2
+    assert "synthetic log snapshot" in capsys.readouterr().err

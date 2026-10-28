@@ -6,7 +6,7 @@ IncidentClue is designed to analyze logs, service health, and deployment events,
 
 ## Status
 
-Early development. The CLI can diagnose supplied evidence or optionally gather one synthetic health observation through model-requested tool calling before diagnosis. Both paths validate business rules and citation membership and support local run records. A three-case synthetic pilot checked uncertainty, and one live tool-assisted investigation succeeded. Human review and broader evaluation remain pending, along with the HTTP API and web frontend.
+Early development. The CLI can diagnose supplied evidence or optionally gather synthetic health or log observations through one model-requested tool call before diagnosis. Both paths validate business rules and citation membership and support local run records. A three-case synthetic pilot checked uncertainty; live health and log tool requests have succeeded. Human review and broader evaluation remain pending, along with the HTTP API and web frontend.
 
 ## Requirements
 
@@ -102,6 +102,16 @@ There are at most two model requests and one tool execution: selection, then a s
 The health file is limited to 16,000 bytes, five health observations, and 2,000 characters of content per observation. The 12,000-byte incident budget also applies after enrichment; it does not measure the entire conversation or exact tokens. The two requests use separate 512-token selection and 1,024-token diagnosis budgets. Each has a 20-second SDK transport timeout; there is no hard overall deadline. The snapshot is timestamped test data, not current production monitoring.
 
 Investigation records additionally contain tool events and returned health evidence, plus a normalized health-snapshot hash and selection/final instruction hashes. These records can contain sensitive observation text; keep them local unless deliberately reviewed for publication. The model cannot execute state-changing tools, but textual suggestions can still violate instructions or overstate evidence. See the [actual tool run and review](docs/validation/health-tool-2026-10-28.md).
+
+To offer both health and logs, add `--logs-file` (Git Bash):
+
+```bash
+./.venv/Scripts/incidentclue.exe investigate data/synthetic/checkout-startup.json --health-file data/synthetic/checkout-health.json --logs-file data/synthetic/checkout-logs.json --env-file .env --record-dir runs
+```
+
+The model can choose either tool or skip lookup; only one tool may execute. `get_logs` requires service, `start_time`, and `end_time` with timezone offsets. Python rejects extra arguments, reversed/empty windows, and windows longer than one hour. Filtering is inclusive at both ends. The result contains the five most recent matching observations in timestamp/ID order, plus `truncated` when more matches exist. Empty results describe this snapshot only; they do not prove that no errors occurred. Only returned IDs become eligible citations, so out-of-window or truncated-away entries cannot be cited unless independently supplied in the original incident.
+
+Log snapshots are limited to 64,000 file bytes, 20 unique log observations, timezone-aware timestamps, and 2,000 content characters per observation. The existing enriched-incident byte limit still applies. Omit `--logs-file` to keep the health-only behavior. Records include the normalized log snapshot hash when configured and actual returned log text when requested. See the [live two-tool selection review](docs/validation/log-tool-2026-10-28.md). Rebuild the Docker image after source changes; [container instructions](docs/containers.md) explain the extra option.
 
 ## Diagnose an incident from Python
 
@@ -199,6 +209,7 @@ IncidentClue/
       test_diagnosis_request.py
       test_cli.py
       test_investigation.py
+      test_logs.py
     pyproject.toml
     requirements-dev.lock.txt
   frontend/
@@ -209,6 +220,8 @@ IncidentClue/
       checkout-ambiguous.json
       checkout-insufficient.json
       checkout-health.json
+      checkout-startup.json
+      checkout-logs.json
   evals/
     pilot-cases.json
   docs/

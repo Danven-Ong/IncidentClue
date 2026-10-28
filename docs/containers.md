@@ -56,6 +56,8 @@ docker run --rm --read-only \
 
 The live commands need network access, unlike the offline help checks. For single-request diagnosis, replace `investigate ... --health-file ...` with `diagnose /inputs/checkout.json`. CLI exit codes and validation rules are unchanged.
 
+To try model selection between health and logs, rebuild the image and use `/inputs/checkout-startup.json` as the incident in these commands, adding `--logs-file /inputs/checkout-logs.json`. Both snapshots are already under the mounted synthetic folder. The app offers both tools but executes at most one; it does not automatically read both into the model context. The optional log file and returned observations are validated and recorded. Older images must be rebuilt to recognise the new flag.
+
 Named-volume records remain after the disposable container exits. Their `/app/runs/...` paths are inside Docker storage, not the checkout's `runs/` directory. List them with:
 
 ```sh

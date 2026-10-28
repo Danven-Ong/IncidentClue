@@ -34,7 +34,7 @@ from incidentclue.investigation import (
     FINAL_INSTRUCTIONS, MAX_MODEL_REQUESTS, MAX_SELECTION_TOKENS, MAX_TOOL_CALLS,
     TOOL_INSTRUCTIONS, investigate_incident,
 )
-from incidentclue.tools import load_health_snapshot
+from incidentclue.tools import load_health_snapshot, load_log_snapshot
 
 MAX_INPUT_FILE_BYTES = 64_000
 
@@ -82,7 +82,7 @@ def main(argv: list[str] | None = None) -> int:
     commands = parser.add_subparsers(dest="command", required=True)
     for name, help_text in (
         ("diagnose", "Diagnose supplied incident evidence."),
-        ("investigate", "Optionally gather synthetic health evidence before diagnosis."),
+        ("investigate", "Optionally gather synthetic health or log evidence before diagnosis."),
     ):
         command = commands.add_parser(name, help=help_text)
         command.add_argument("incident", type=Path)
@@ -92,6 +92,8 @@ def main(argv: list[str] | None = None) -> int:
         if name == "investigate":
             command.add_argument("--health-file", type=Path, required=True,
                                  help="Explicit synthetic health snapshot; no live probes.")
+            command.add_argument("--logs-file", type=Path,
+                                 help="Optional synthetic log snapshot; enables get_logs.")
     args = parser.parse_args(argv)
 
     started = perf_counter()
@@ -162,6 +164,7 @@ def main(argv: list[str] | None = None) -> int:
             "serialized_sha256": hashlib.sha256(serialized).hexdigest(),
         }
         snapshot = None
+        logs = None
         if args.command == "investigate":
             snapshot = load_health_snapshot(args.health_file)
             record["health_snapshot"] = {
@@ -170,12 +173,20 @@ def main(argv: list[str] | None = None) -> int:
                     snapshot.model_dump_json().encode("utf-8")
                 ).hexdigest(),
             }
+            if args.logs_file is not None:
+                logs = load_log_snapshot(args.logs_file)
+                record["log_snapshot"] = {
+                    "file_name": args.logs_file.name,
+                    "serialized_sha256": hashlib.sha256(
+                        logs.model_dump_json().encode("utf-8")
+                    ).hexdigest(),
+                }
         with create_groq_client(os.environ.get("GROQ_API_KEY", "")) as client:
             if snapshot is None:
                 result = diagnose_incident(incident, client, model)
             else:
                 result = investigate_incident(
-                    incident, client, snapshot, model, events=record["tool_events"]
+                    incident, client, snapshot, model, events=record["tool_events"], logs=logs,
                 )
         record["outcome"] = "success"
         record["diagnosis"] = result.model_dump(mode="json")

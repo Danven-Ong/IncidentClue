@@ -1,0 +1,9 @@
+{
+  "incident_id": "checkout-004",
+  "service": "checkout",
+  "summary": "Checkout failed to start during the incident window 2026-10-28T02:00:00Z to 2026-10-28T02:05:00Z. Investigate application startup errors.",
+  "evidence": [
+    {"id": "E1", "timestamp": "2026-10-28T02:00:00Z", "kind": "deployment", "content": "Checkout version 2 deployed."},
+    {"id": "E2", "timestamp": "2026-10-28T02:02:00Z", "kind": "health", "content": "Checkout health endpoint returns HTTP 503; no readiness detail was captured."}
+  ]
+}
