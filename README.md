@@ -132,9 +132,20 @@ The function sends one request with separate instructions and incident data, req
 
 The [first live checkout result](docs/validation/checkout-diagnosis-2026-10-28-a4391347.json) identified the missing PAYMENT_API_URL configuration using evidence E2. It passed structural/reference validation and an assistant review of the supplied observations; independent human review is pending. One synthetic case does not establish accuracy across incidents.
 
+## Docker
+
+Build and run offline CLI help from the repository root:
+
+```sh
+docker build --file backend/Dockerfile --tag incidentclue:local .
+docker run --rm --network none --read-only incidentclue:local --help
+```
+
+The image uses a digest-pinned Python base, pinned runtime dependencies, and a non-root user. It contains no provider credentials or incident fixtures. See [container instructions](docs/containers.md) for Git Bash, PowerShell, and Linux/macOS commands to mount inputs/configuration and retain run records. The runtime is packaged locally; model inference remains hosted by Groq.
+
 ## Tests
 
-The [CI workflow](.github/workflows/ci.yml) runs on every push and pull request, including draft PRs. It checks Linux with Python 3.12/3.13 and Windows with Python 3.13. Each job installs pinned dependencies, lints the backend, builds the source distribution and wheel, installs that wheel, checks dependencies, and runs the offline test suite. An additional smoke check runs the installed CLI outside the checkout. The stable `CI gate` check succeeds only when every matrix job succeeds. See [Actions runs](https://github.com/Danven-Ong/IncidentClue/actions) for actual results.
+The [CI workflow](.github/workflows/ci.yml) runs on every push and pull request, including draft PRs. It checks Linux with Python 3.12/3.13 and Windows with Python 3.13. Each job installs pinned dependencies, lints the backend, builds the source distribution and wheel, installs that wheel, checks dependencies, and runs the offline test suite. An additional smoke check runs the installed CLI outside the checkout. A Linux container job builds the runtime image and checks non-root execution, dependencies, CLI help, mounted input, and error-record writing without credentials or container network access. The stable `CI gate` check succeeds only when the entire matrix and container job succeed. See [Actions runs](https://github.com/Danven-Ong/IncidentClue/actions) for actual results.
 
 CI uses no provider secrets and makes no intentional live LLM requests; model/provider interactions in tests use fake transports. Package downloads still require network access. Live synthetic evaluations are separate, deliberate runs. Workflow actions are pinned to commit SHAs, repository permissions are read-only, and checkout credentials are not persisted.
 
@@ -145,7 +156,7 @@ python -m ruff check --config backend/pyproject.toml backend
 python -m build --no-isolation backend
 ```
 
-Use your virtual environment's Python. Building requires the pinned development/build tools. CI tests the installed wheel rather than an editable source install; source-distribution tests and fixtures remain in the full repository checkout. Passing CI is a prerequisite for review, not an automatic deployment or merge. Enforcing checks also requires branch protection supported by the repository's GitHub plan and configuration. Docker packaging and release publishing are separate future steps.
+Use your virtual environment's Python. Building requires the pinned development/build tools. CI tests the installed wheel rather than an editable source install; source-distribution tests and fixtures remain in the full repository checkout. Passing CI is a prerequisite for review, not an automatic deployment or merge. The repository's protected main branch requires the CI gate. Image publishing and deployment remain future steps.
 
 From the repository root, run the backend tests with the development environment's Python.
 

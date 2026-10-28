@@ -62,14 +62,57 @@ jobs:
           python -I -m incidentclue.cli --help
           incidentclue investigate --help
 
+  container:
+    name: Container build and offline smoke
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out source
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - name: Build runtime image
+        run: docker build --file backend/Dockerfile --tag incidentclue:ci .
+      - name: Check installed commands without networking
+        run: |
+          docker run --rm --network none --read-only incidentclue:ci --help
+          docker run --rm --network none --read-only incidentclue:ci investigate --help
+      - name: Check runtime identity and installed dependencies
+        run: |
+          docker run --rm --network none --read-only --entrypoint python incidentclue:ci -c '
+          import importlib.util, os
+          from pathlib import Path
+          assert os.getuid() == 10001
+          assert importlib.util.find_spec("pytest") is None
+          assert importlib.util.find_spec("ruff") is None
+          assert importlib.util.find_spec("build") is None
+          assert not Path("/app/.env").exists()
+          assert not Path("/app/data").exists()
+          '
+          docker run --rm --network none --read-only --entrypoint python incidentclue:ci -m pip check
+      - name: Check mounted input and error record without credentials
+        run: |
+          set +e
+          output=$(docker run --rm --network none --read-only \
+            --tmpfs /app/runs:uid=10001,gid=10001,mode=0700 \
+            --mount "type=bind,source=$GITHUB_WORKSPACE/data/synthetic,target=/inputs,readonly" \
+            incidentclue:ci diagnose /inputs/checkout.json --record-dir /app/runs 2>&1)
+          status=$?
+          set -e
+          printf '%s\n' "$output"
+          test "$status" -eq 2
+          [[ "$output" == *"Set GROQ_API_KEY"* ]]
+          [[ "$output" == *"Run record:"* ]]
+
   gate:
     name: CI gate
-    needs: backend
+    needs: [backend, container]
     if: ${{ always() }}
     runs-on: ubuntu-latest
     timeout-minutes: 2
     env:
       BACKEND_RESULT: ${{ needs.backend.result }}
+      CONTAINER_RESULT: ${{ needs.container.result }}
     steps:
-      - name: Require every backend job to succeed
-        run: test "$BACKEND_RESULT" = success
+      - name: Require backend and container checks to succeed
+        run: test "$BACKEND_RESULT" = success && test "$CONTAINER_RESULT" = success
