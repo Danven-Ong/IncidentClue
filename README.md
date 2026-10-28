@@ -6,7 +6,7 @@ IncidentClue is designed to analyze logs, service health, and deployment events,
 
 ## Status
 
-Early development. The diagnostic CLI loads an incident file, requests a structured diagnosis through Groq, validates business rules and citation membership, and optionally saves a local run record. One synthetic checkout incident has been diagnosed successfully through the CLI. The HTTP API, web frontend, and broader diagnosis evaluation remain pending.
+Early development. The diagnostic CLI loads an incident file, requests a structured diagnosis through Groq, validates business rules and citation membership, and optionally saves a local run record. A three-case synthetic pilot produced a hypothesis for clear evidence and abstained for ambiguous and absent evidence. Human review and broader diagnosis evaluation remain pending, along with the HTTP API and web frontend.
 
 ## Requirements
 
@@ -85,6 +85,8 @@ Standard output contains only the validated Diagnosis JSON. Errors and the optio
 
 See the [recorded CLI checkout run](docs/validation/cli-checkout-2026-10-28-1cef626a.json) for one actual result and its review limitations.
 
+The [three-case pilot report](docs/validation/pilot-2026-10-28.md) preserves clear, ambiguous, and insufficient-evidence results, evaluator criteria, and limitations found in suggested checks. Expected outcomes live separately in `evals/pilot-cases.json` and are never included in incident inputs. Three synthetic examples do not establish general diagnosis accuracy.
+
 ## Diagnose an incident from Python
 
 From the repository root, after installing the backend and configuring .env, use the library function:
@@ -161,6 +163,10 @@ IncidentClue/
   data/
     synthetic/
       checkout.json
+      checkout-ambiguous.json
+      checkout-insufficient.json
+  evals/
+    pilot-cases.json
   docs/
     architecture.md
   .gitignore

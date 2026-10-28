@@ -98,6 +98,10 @@ flowchart LR
 
 The intended development path is a CLI over the investigation engine, then a FastAPI interface over the same engine, then a web client. A queue or persistent job API can be introduced if measured investigation duration requires asynchronous execution; it is not a prerequisite for the first request.
 
+## Evaluation boundary
+
+Synthetic incident files contain only model-visible incident fields. Expected statuses and review criteria live separately in evals/pilot-cases.json, which the CLI does not load. The initial three-case pilot and actual outputs are preserved in docs/validation/pilot-2026-10-28.md. Offline validation tests establish deterministic contract/error behavior; live manual review checks whether supplied observations support claims. Neither citation membership nor matching an expected status alone establishes diagnosis correctness.
+
 ## Evidence and execution boundaries
 
 Logs and retrieved content are untrusted input. Valid response structure and resolvable evidence IDs do not establish that a diagnosis is correct; evidence support requires separate evaluation. Expected root-cause labels must remain separate from model-visible incident snapshots.
