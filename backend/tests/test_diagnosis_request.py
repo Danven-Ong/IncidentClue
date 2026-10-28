@@ -41,6 +41,21 @@ def provider_client(handler):
     )
 
 
+@pytest.mark.parametrize("malformation", ["null_choices", "missing_choices", "null_message", "missing_finish"])
+def test_rejects_malformed_response_envelope(incident_data, diagnosis_completion, malformation):
+    if malformation == "null_choices":
+        diagnosis_completion["choices"] = None
+    elif malformation == "missing_choices":
+        diagnosis_completion.pop("choices")
+    elif malformation == "null_message":
+        diagnosis_completion["choices"][0]["message"] = None
+    else:
+        diagnosis_completion["choices"][0].pop("finish_reason")
+    with provider_client(lambda request: httpx2.Response(200, json=diagnosis_completion)) as client:
+        with pytest.raises(DiagnosisError):
+            diagnose_incident(Incident.model_validate(incident_data), client)
+
+
 @pytest.fixture
 def response_client(diagnosis_completion):
     with provider_client(

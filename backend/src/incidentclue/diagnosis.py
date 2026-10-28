@@ -1,6 +1,7 @@
 """Single-request incident diagnosis and validation against supplied evidence."""
 
 from openai import OpenAI
+from openai.types.chat import ChatCompletionMessage
 from pydantic import ValidationError
 
 from incidentclue.llm import ConfigurationError, DEFAULT_MODEL, REQUEST_TIMEOUT_SECONDS
@@ -103,10 +104,13 @@ def _request_diagnosis_content(
         },
     )
 
-    if not response.choices or len(response.choices) != 1:
+    choices = getattr(response, "choices", None)
+    if not isinstance(choices, list) or len(choices) != 1:
         raise DiagnosisError("Expected exactly one diagnosis response choice.")
-    choice = response.choices[0]
-    if choice.finish_reason != "stop":
+    choice = choices[0]
+    if not isinstance(getattr(choice, "message", None), ChatCompletionMessage):
+        raise DiagnosisError("Provider returned an invalid diagnosis message.")
+    if getattr(choice, "finish_reason", None) != "stop":
         raise DiagnosisError("Provider did not complete the diagnosis normally.")
     if choice.message.refusal:
         raise DiagnosisError("Provider refused the diagnosis request.")

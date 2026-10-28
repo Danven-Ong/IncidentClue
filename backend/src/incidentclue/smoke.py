@@ -10,6 +10,7 @@ from time import perf_counter
 
 from dotenv import load_dotenv
 from openai import APIError, OpenAI
+from openai.types.chat import ChatCompletionMessage
 
 from incidentclue.llm import ConfigurationError, DEFAULT_MODEL, create_groq_client
 
@@ -51,14 +52,17 @@ def check_connection(client: OpenAI, model: str) -> dict[str, object]:
     )
     elapsed_ms = round((perf_counter() - started) * 1000, 2)
 
-    if len(response.choices) != 1:
+    choices = getattr(response, "choices", None)
+    if not isinstance(choices, list) or len(choices) != 1:
         raise SmokeCheckError("Expected exactly one provider response choice.")
-    choice = response.choices[0]
-    if choice.finish_reason != "stop":
+    choice = choices[0]
+    if not isinstance(getattr(choice, "message", None), ChatCompletionMessage):
+        raise SmokeCheckError("Provider returned an invalid connectivity message.")
+    if getattr(choice, "finish_reason", None) != "stop":
         raise SmokeCheckError("Provider did not complete the response normally.")
     if choice.message.refusal:
         raise SmokeCheckError("Provider refused the connectivity request.")
-    if not choice.message.content:
+    if not isinstance(choice.message.content, str) or not choice.message.content:
         raise SmokeCheckError("Provider returned no response content.")
 
     try:
@@ -93,7 +97,7 @@ def main(argv: list[str] | None = None) -> int:
             return 2
         try:
             load_dotenv(args.env_file, override=False, encoding="utf-8-sig")
-        except OSError:
+        except (OSError, UnicodeError):
             print("Could not read the specified environment file.", file=sys.stderr)
             return 2
 

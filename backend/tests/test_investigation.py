@@ -70,6 +70,51 @@ def fake_client(responses, requests):
                   http_client=httpx2.Client(transport=httpx2.MockTransport(handler)))
 
 
+@pytest.mark.parametrize("malformation", [
+    "null_choices", "missing_choices", "null_message", "missing_finish",
+    "null_function", "null_arguments", "null_identifier", "invalid_calls",
+])
+def test_malformed_selection_is_controlled_without_execution(incident, health, selection, malformation, monkeypatch):
+    if malformation == "null_choices":
+        selection["choices"] = None
+    elif malformation == "missing_choices":
+        selection.pop("choices")
+    elif malformation == "null_message":
+        selection["choices"][0]["message"] = None
+    elif malformation == "missing_finish":
+        selection["choices"][0].pop("finish_reason")
+    elif malformation == "invalid_calls":
+        selection["choices"][0]["message"]["tool_calls"] = "invalid"
+    else:
+        call = selection["choices"][0]["message"]["tool_calls"][0]
+        if malformation == "null_function":
+            call["function"] = None
+        elif malformation == "null_arguments":
+            call["function"]["arguments"] = None
+        else:
+            call["id"] = None
+    monkeypatch.setattr(investigation, "get_service_health", lambda *a, **k: pytest.fail("executed"))
+    with fake_client([selection], []) as client, pytest.raises(DiagnosisError):
+        investigation.investigate_incident(incident, client, health)
+
+
+def test_malformed_selection_cli_still_writes_failure_record(tmp_path, incident, health, selection, monkeypatch, capsys):
+    from incidentclue import cli
+    selection["choices"] = None
+    source, snapshot = tmp_path / "incident.json", tmp_path / "health.json"
+    source.write_text(incident.model_dump_json())
+    snapshot.write_text(health.model_dump_json())
+    monkeypatch.setattr(cli, "create_groq_client", lambda key: fake_client([selection], []))
+    assert cli.main([
+        "investigate", str(source), "--health-file", str(snapshot),
+        "--record-dir", str(tmp_path / "runs"),
+    ]) == 1
+    output = capsys.readouterr()
+    assert output.out == "" and "Traceback" not in output.err
+    record = json.loads(next((tmp_path / "runs").glob("*.json")).read_text())
+    assert record["outcome"] == "diagnosis_error" and record["exit_code"] == 1
+
+
 def abstention():
     return completion({"content": json.dumps({
         "status": "insufficient_evidence", "probable_cause": None,

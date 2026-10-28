@@ -50,6 +50,30 @@ def transport_client(handler):
     )
 
 
+@pytest.mark.parametrize("malformation", ["null_choices", "missing_choices", "null_message", "missing_finish", "invalid_content"])
+def test_malformed_provider_envelope_fails_cleanly(completion, malformation):
+    if malformation == "null_choices":
+        completion["choices"] = None
+    elif malformation == "missing_choices":
+        completion.pop("choices")
+    elif malformation == "null_message":
+        completion["choices"][0]["message"] = None
+    elif malformation == "missing_finish":
+        completion["choices"][0].pop("finish_reason")
+    else:
+        completion["choices"][0]["message"]["content"] = 123
+    with transport_client(lambda request: httpx2.Response(200, json=completion)) as client:
+        with pytest.raises(smoke.SmokeCheckError):
+            smoke.check_connection(client, DEFAULT_MODEL)
+
+
+def test_invalid_environment_encoding_is_a_configuration_error(tmp_path, capsys):
+    path = tmp_path / "invalid.env"
+    path.write_bytes(b"\xff\xfe")
+    assert smoke.main(["--env-file", str(path)]) == 2
+    assert "Traceback" not in capsys.readouterr().err
+
+
 def test_client_has_explicit_provider_timeout_and_no_retries():
     with create_groq_client(" test-groq-key ") as client:
         assert str(client.base_url).rstrip("/") == GROQ_BASE_URL

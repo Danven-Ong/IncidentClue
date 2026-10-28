@@ -6,6 +6,7 @@ from typing import Annotated, TypedDict
 
 from langgraph.graph import END, START, StateGraph
 from openai import OpenAI
+from openai.types.chat import ChatCompletionMessage
 from pydantic import ValidationError
 
 from incidentclue.diagnosis import (
@@ -129,27 +130,37 @@ def build_investigation_graph(
             parallel_tool_calls=False, max_completion_tokens=MAX_SELECTION_TOKENS,
         )
         update = {"model_requests_used": state["model_requests_used"] + 1}
-        if len(response.choices) != 1:
+        choices = getattr(response, "choices", None)
+        if not isinstance(choices, list) or len(choices) != 1:
             raise DiagnosisError("Expected exactly one tool-selection response.")
-        choice = response.choices[0]
-        if choice.message.refusal or choice.finish_reason not in ("stop", "tool_calls"):
+        choice = choices[0]
+        if not isinstance(getattr(choice, "message", None), ChatCompletionMessage):
+            raise DiagnosisError("Provider returned an invalid tool-selection message.")
+        finish_reason = getattr(choice, "finish_reason", None)
+        if choice.message.refusal or finish_reason not in ("stop", "tool_calls"):
             raise DiagnosisError("Provider did not complete tool selection normally.")
+        if choice.message.tool_calls is not None and not isinstance(choice.message.tool_calls, list):
+            raise DiagnosisError("Provider returned invalid tool calls.")
         calls = choice.message.tool_calls or []
         if len(calls) > 1:
             events.append({"outcome": "rejected", "reason": "tool_budget_exceeded"})
             raise DiagnosisError("Per-response tool-call budget exceeded; no tools were executed.")
-        if bool(calls) != (choice.finish_reason == "tool_calls"):
+        if bool(calls) != (finish_reason == "tool_calls"):
             raise DiagnosisError("Inconsistent tool-selection response.")
         if not calls:
             events.append({"outcome": "not_requested"})
             return {**update, "pending_call": None, "stop_reason": "model_finished"}
         call = calls[0]
-        if call.type != "function" or call.function.name not in argument_models:
+        function = getattr(call, "function", None)
+        name = getattr(function, "name", None)
+        if getattr(call, "type", None) != "function" or not isinstance(name, str) or name not in argument_models:
             events.append({"outcome": "rejected", "reason": "unknown_tool"})
             raise DiagnosisError("Provider requested an unsupported tool.")
-        if not call.id or len(call.id) > 128 or any(item["tool_call_id"] == call.id for item in state["tool_history"]):
+        if not isinstance(getattr(call, "id", None), str) or not call.id or len(call.id) > 128 or any(item["tool_call_id"] == call.id for item in state["tool_history"]):
             raise DiagnosisError("Provider returned an invalid or reused tool-call identifier.")
         try:
+            if not isinstance(getattr(function, "arguments", None), str):
+                raise ValueError("Tool arguments must be JSON text.")
             if len(call.function.arguments.encode("utf-8")) > MAX_TOOL_ARGUMENT_BYTES:
                 raise ValueError("Argument budget exceeded.")
             args = argument_models[call.function.name].model_validate_json(call.function.arguments)
