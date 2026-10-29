@@ -1,6 +1,51 @@
 name: incidentclue
 
 services:
+  postgres:
+    image: postgres:17-bookworm@sha256:839fbb5a4942a7758dd93e18b42ea5649807491a0545b5eeeb8f0b8bb11857a5
+    profiles: [durable]
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-incidentclue}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-local-development-only}
+      POSTGRES_DB: ${POSTGRES_DB:-incidentclue}
+    ports:
+      - "127.0.0.1:${INCIDENTCLUE_POSTGRES_PORT:-55432}:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: [CMD-SHELL, 'pg_isready -U "$${POSTGRES_USER}" -d "$${POSTGRES_DB}"']
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  durable:
+    image: incidentclue:local
+    profiles: [durable]
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    read_only: true
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      # Override the complete URI when using credentials that need URI encoding.
+      INCIDENTCLUE_DATABASE_URL: ${INCIDENTCLUE_COMPOSE_DATABASE_URL:-postgresql://incidentclue:local-development-only@postgres:5432/incidentclue}
+    volumes:
+      - type: bind
+        source: ./data/synthetic
+        target: /inputs
+        read_only: true
+        bind:
+          create_host_path: false
+      - type: bind
+        source: ./.env
+        target: /config/provider.env
+        read_only: true
+        bind:
+          create_host_path: false
+    command: ["--help"]
+
   incidentclue:
     image: incidentclue:local
     build:
@@ -37,5 +82,6 @@ services:
       - /app/runs
 
 volumes:
+  postgres-data:
   runs:
     name: incidentclue-compose-runs
