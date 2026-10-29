@@ -185,15 +185,18 @@ class Database:
         """, (identifier,))
         return self.get(identifier)
 
-    def begin(self, identifier: str) -> None:
+    def begin(self, identifier: str, expected_updated_at=None) -> None:
         # Clear requests already acknowledged by a previous pause. Requests racing
         # after this update are honored before the next node starts.
         if self.owner != identifier:
             raise PersistenceError("Execution ownership is required.")
+        if expected_updated_at is None:
+            expected_updated_at = self.get(identifier)["updated_at"]
         self.connection.execute("""
-            UPDATE ic_investigations SET status='running',pause_requested=false,
+            UPDATE ic_investigations SET status='running',
+                pause_requested=CASE WHEN updated_at=%s THEN false ELSE pause_requested END,
                 error_code=NULL,updated_at=now() WHERE id=%s
-        """, (identifier,))
+        """, (expected_updated_at, identifier))
 
     def attempts(self, identifier: str) -> list[dict]:
         return self.connection.execute(

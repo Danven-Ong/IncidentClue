@@ -1,6 +1,5 @@
 """Storage contracts against an explicitly selected, isolated PostgreSQL DB."""
 
-import os
 from uuid import uuid4
 
 import pytest
@@ -10,21 +9,6 @@ from incidentclue.persistence import (
     InvestigationBusy, PersistenceError, RecoveryRequired,
     investigation_id, open_database,
 )
-
-
-@pytest.fixture
-def database_url():
-    url = os.environ.get("INCIDENTCLUE_TEST_DATABASE_URL")
-    if not url:
-        pytest.skip("Set INCIDENTCLUE_TEST_DATABASE_URL to an isolated PostgreSQL database.")
-    return url
-
-
-@pytest.fixture
-def db(database_url):
-    with open_database(database_url) as database:
-        database.initialize()
-        yield database
 
 
 def test_configuration_and_identity_are_controlled():
