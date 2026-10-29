@@ -43,6 +43,10 @@ def lock_key(identifier: str) -> int:
     return int.from_bytes(sha256(identifier.encode()).digest()[:8], "big", signed=True)
 
 
+def operation_key(name: str, state: dict) -> str:
+    return f"{name}:{state['model_requests_used']}:{state['tool_calls_used']}"
+
+
 def json_data(value):
     """Persist only JSON data; never enable arbitrary object/pickle fallback."""
     def encode(item):
@@ -209,7 +213,7 @@ class Database:
         if self.owner != identifier:
             raise PersistenceError("Execution ownership is required before an attempt.")
         kind = "tool" if name == "execute" else "model"
-        operation = f"{name}:{state['model_requests_used']}:{state['tool_calls_used']}"
+        operation = operation_key(name, state)
         with self.connection.transaction():
             row = self.connection.execute(
                 "SELECT status FROM ic_investigations WHERE id=%s FOR UPDATE", (identifier,),

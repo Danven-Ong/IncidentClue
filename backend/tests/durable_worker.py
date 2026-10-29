@@ -66,6 +66,21 @@ def main():
                 os._exit(75)
                 yield
             db.execution = die_on_execution
+        elif crash == "after_input":
+            original_execution = db.execution
+            @contextmanager
+            def announce_execution(identifier):
+                print(json.dumps({"investigation_id": identifier}), flush=True)
+                with original_execution(identifier):
+                    yield
+            db.execution = announce_execution
+            original_put = db.saver.put
+            def put(*args, **kwargs):
+                result = original_put(*args, **kwargs)
+                if args[2].get("source") == "input":
+                    os._exit(76)
+                return result
+            db.saver.put = put
         if command == "start":
             incident = Incident.model_validate_json(Path(sys.argv[2]).read_text(encoding="utf-8"))
             health = load_health_snapshot(Path(sys.argv[3]))

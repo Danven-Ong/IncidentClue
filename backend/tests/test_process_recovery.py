@@ -106,10 +106,11 @@ def test_death_during_model_request_refuses_ambiguous_replay(db, worker):
     assert len(requests.read_text().splitlines()) == 1
 
 
-def test_metadata_only_creation_can_recover(db, worker):
+@pytest.mark.parametrize("crash,code", [("before_initial", 75), ("after_input", 76)])
+def test_partial_creation_can_recover(db, worker, crash, code):
     run, _, requests, _, _ = worker
-    result = run("start", crash="before_initial")
-    assert result.returncode == 75
+    result = run("start", crash=crash)
+    assert result.returncode == code
     identifier = json.loads(result.stdout)["investigation_id"]
     done = output(run("resume", identifier))
     assert done["status"] == "completed" and len(requests.read_text().splitlines()) == 3

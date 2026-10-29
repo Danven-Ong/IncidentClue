@@ -1,6 +1,6 @@
 """Shared durable lifecycle used by the CLI and future application clients."""
 
-from contextlib import nullcontext
+from contextlib import ExitStack
 from hashlib import sha256
 from importlib.metadata import version
 from pathlib import Path
@@ -17,7 +17,7 @@ from incidentclue.investigation import (
 )
 from incidentclue.llm import ConfigurationError, DEFAULT_MODEL
 from incidentclue.persistence import (
-    Database, PersistenceError, RecoveryRequired, investigation_id, json_data,
+    Database, PersistenceError, RecoveryRequired, investigation_id, json_data, operation_key,
 )
 from incidentclue.schemas import Diagnosis, Evidence, Incident
 from incidentclue.tools import HealthSnapshot, LogSnapshot
@@ -97,6 +97,11 @@ class Lifecycle:
             initial = initial_investigation_state(Incident.model_validate(row["inputs"]["incident"]))
             # Save the initial input and START transition, without any physical call.
             graph.invoke(initial, config, interrupt_before=["decide"], durability="sync")
+            snapshot = graph.get_state(config)
+        elif snapshot.next == ("__start__",):
+            # A process may die after the input checkpoint but before START has
+            # applied it. Finish initialization before validating/running nodes.
+            graph.invoke(None, config, interrupt_before=["decide"], durability="sync")
             snapshot = graph.get_state(config)
         return snapshot
 
@@ -209,9 +214,9 @@ class Lifecycle:
     def _advance(self, identifier, row, client_factory, pause_after):
         # Enter the client context only once. Database statements before every node
         # and every attempt fail closed if the ownership connection has been lost.
-        context = client_factory() if client_factory else nullcontext(None)
-        with context as client:
-            graph = self._graph(row, client)
+        with ExitStack() as resources:
+            client = None
+            graph = self._graph(row)
             config = graph_config(identifier)
             for _ in range(GRAPH_RECURSION_LIMIT):
                 state = graph.get_state(config)
@@ -226,6 +231,17 @@ class Lifecycle:
                     self.db.status(identifier, "paused")
                     return
                 next_node = state.next[0]
+                needs_model = next_node == "diagnose" or (
+                    next_node == "decide" and state.values["tool_calls_used"] < MAX_TOOL_CALLS
+                    and state.values["model_requests_used"] < MAX_MODEL_REQUESTS - 1
+                )
+                cached = any(item["operation"] == operation_key(next_node, state.values)
+                             and item["status"] == "done" for item in self.db.attempts(identifier))
+                if needs_model and not cached and client is None:
+                    if client_factory is None:
+                        raise ConfigurationError("Provider credentials are required for a new model request.")
+                    client = resources.enter_context(client_factory())
+                    graph = self._graph(row, client)
                 graph.invoke(None, config, interrupt_after="*", durability="sync")
                 state = graph.get_state(config)
                 if not state.next:

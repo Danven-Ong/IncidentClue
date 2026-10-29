@@ -204,3 +204,12 @@ def test_duplicate_lookup_after_resume_is_not_executed_again(db, inputs):
     assert done["charged"] == {"model": 3, "tool": 1}
     assert done["state"]["stop_reason"] == "repeated_request"
     assert len(done["state"]["tool_history"]) == 1
+
+
+def test_validation_only_resume_does_not_require_a_provider_client(db, inputs):
+    service = Lifecycle(db)
+    identifier = service.start(*inputs)
+    paused = service.resume(identifier, lambda: fake_client(responses(), []), pause_after="diagnose")
+    assert paused["next_nodes"] == ["validate"]
+    done = service.resume(identifier, lambda: pytest.fail("validation created a provider client"))
+    assert done["status"] == "completed" and done["charged"]["model"] == 3
