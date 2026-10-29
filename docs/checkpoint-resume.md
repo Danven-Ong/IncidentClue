@@ -43,6 +43,9 @@ Execution is synchronous in the start/resume process. Statuses are `ready`,
 session advisory lock, held by the executing process, rejects concurrent resumes.
 Lock release on process death allows recovery; a stale `running` status is not
 proof of a live executor. Inspect reports execution ownership separately.
+PostgreSQL may observe a socket disconnect shortly after the local process exits;
+until then a resume correctly reports busy. Retry the command after ownership is
+released; the busy command executes no nodes or provider calls.
 
 ## Recovery, compatibility and budgets
 

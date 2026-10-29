@@ -50,6 +50,16 @@ def output(result):
     return json.loads(result.stdout)
 
 
+def wait_for_disconnect(db, identifier):
+    # os._exit has reaped the client, but PostgreSQL can still be processing its
+    # socket close. The application correctly reports busy until the DB releases
+    # session ownership. Synchronize on that real condition, not a fixed delay.
+    deadline = time.monotonic() + 10
+    while db.is_executing(identifier):
+        assert time.monotonic() < deadline, "PostgreSQL did not release the dead executor."
+        time.sleep(0.05)
+
+
 def test_separate_processes_restore_snapshots_model_and_history(db, worker):
     run, _, requests, incident_path, health_path = worker
     paused = output(run("start", boundary="execute"))
@@ -80,6 +90,7 @@ def test_crashes_outside_uncertain_window_recover_without_extra_requests(db, wor
     # the later nodes, proving fetched output also survives checkpoint replay.
     result = run("resume", identifier, crash=crash)
     assert result.returncode == exit_code, result.stderr
+    wait_for_disconnect(db, identifier)
     stale = output(run("inspect", identifier))
     assert stale["recovery_needed"] and not stale["executing"]
     # The first selection remains charged across every crash window.
@@ -98,6 +109,7 @@ def test_death_during_model_request_refuses_ambiguous_replay(db, worker):
     assert metadata_only.returncode == 75
     identifier = json.loads(metadata_only.stdout)["investigation_id"]
     assert run("resume", identifier, crash="during").returncode == 71
+    wait_for_disconnect(db, identifier)
     service = Lifecycle(db)
     with pytest.raises(RecoveryRequired, match="uncertain"):
         service.resume(identifier, lambda: pytest.fail("reissued uncertain request"))
@@ -112,6 +124,7 @@ def test_partial_creation_can_recover(db, worker, crash, code):
     result = run("start", crash=crash)
     assert result.returncode == code
     identifier = json.loads(result.stdout)["investigation_id"]
+    wait_for_disconnect(db, identifier)
     done = output(run("resume", identifier))
     assert done["status"] == "completed" and len(requests.read_text().splitlines()) == 3
 
