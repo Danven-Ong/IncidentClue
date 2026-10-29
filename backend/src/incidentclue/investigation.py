@@ -106,8 +106,9 @@ def build_investigation_graph(
     client: OpenAI, snapshot: HealthSnapshot, model: str = DEFAULT_MODEL, *,
     logs: LogSnapshot | None = None, events: list[dict] | None = None,
     steps: list[str] | None = None,
+    checkpointer=None, run_node=None,
 ):
-    """Compile a sequential graph without checkpoints, retries, or resume support."""
+    """Compile the shared graph; durable clients supply storage and an attempt guard."""
     if events is None:
         events = []
     if steps is None:
@@ -227,8 +228,21 @@ def build_investigation_graph(
         return {"diagnosis": _validate_diagnosis(_enriched(state), state["raw_diagnosis"])}
 
     graph = StateGraph(InvestigationState)
+    def guarded(name, node):
+        def invoke(state):
+            # Budget-only routing and validation have no external effects and may
+            # replay safely. Only actual request nodes need a charged reservation.
+            skip = name == "decide" and (
+                state["tool_calls_used"] >= MAX_TOOL_CALLS
+                or state["model_requests_used"] >= MAX_MODEL_REQUESTS - 1
+            )
+            if run_node is None or name == "validate" or skip:
+                return node(state)
+            return run_node(name, state, node)
+        return invoke
+
     for name, node in (("decide", decide), ("execute", execute), ("diagnose", diagnose), ("validate", validate)):
-        graph.add_node(name, node)
+        graph.add_node(name, guarded(name, node))
     graph.add_edge(START, "decide")
     graph.add_conditional_edges("decide", lambda state: "execute" if state["pending_call"] else "diagnose",
                                 {"execute": "execute", "diagnose": "diagnose"})
@@ -236,7 +250,21 @@ def build_investigation_graph(
                                 {"diagnose": "diagnose", "decide": "decide"})
     graph.add_edge("diagnose", "validate")
     graph.add_edge("validate", END)
-    return graph.compile()
+    return graph.compile(checkpointer=checkpointer)
+
+
+def initial_investigation_state(incident: Incident) -> InvestigationState:
+    """Create initial data once; resumption must not reapply these reducer inputs."""
+    initial = {
+        "incident": incident.model_copy(deep=True), "evidence": incident.evidence.copy(),
+        "tool_history": [], "tool_calls_used": 0, "model_requests_used": 0,
+        "pending_call": None, "stop_reason": "", "messages": [
+            {"role": "system", "content": TOOL_INSTRUCTIONS},
+            {"role": "user", "content": incident.model_dump_json()},
+        ],
+    }
+    _enriched(initial)
+    return initial
 
 
 def investigate_incident(
@@ -248,15 +276,7 @@ def investigate_incident(
     """Run a fresh bounded investigation; no cross-process state is restored."""
     if not model.strip():
         raise ConfigurationError("The diagnosis model must not be blank.")
-    initial = {
-        "incident": incident.model_copy(deep=True), "evidence": incident.evidence.copy(),
-        "tool_history": [], "tool_calls_used": 0, "model_requests_used": 0,
-        "pending_call": None, "stop_reason": "", "messages": [
-            {"role": "system", "content": TOOL_INSTRUCTIONS},
-            {"role": "user", "content": incident.model_dump_json()},
-        ],
-    }
-    _enriched(initial)
+    initial = initial_investigation_state(incident)
     graph = build_investigation_graph(client, snapshot, model, logs=logs, events=events, steps=steps)
     result = graph.invoke(initial, {"recursion_limit": GRAPH_RECURSION_LIMIT})
     if summary is not None:

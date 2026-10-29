@@ -6,14 +6,18 @@ IncidentClue is designed to analyze logs, service health, and deployment events,
 
 ## Status
 
-Early development. The CLI can diagnose supplied evidence or optionally gather synthetic health or log observations through one model-requested tool call before diagnosis. Both paths validate business rules and citation membership and support local run records. A three-case synthetic pilot checked uncertainty; live health and log tool requests have succeeded. Human review and broader evaluation remain pending, along with the HTTP API and web frontend.
+Early development. The CLI diagnoses supplied evidence or gathers synthetic health/log observations through a bounded LangGraph investigation. One-shot commands support local JSON run records. Durable commands use PostgreSQL checkpoints to start, inspect, pause and resume the same investigation across process restarts. Business rules, citation membership and request budgets are enforced in Python. Broader diagnosis evaluation, the HTTP API and web frontend remain pending.
 
 ## Requirements
 
 - Python 3.12 or newer
 - pip
+- Docker Desktop/Engine with Compose for the optional PostgreSQL lifecycle
 
 The initial environment was verified on Windows with Python 3.13.
+
+For PostgreSQL setup, durable commands, recovery guarantees and the pause/resume
+demo, see [durable investigation lifecycle](docs/checkpoint-resume.md).
 
 ## Installation
 
@@ -47,7 +51,7 @@ Create local configuration from the template (PowerShell):
 if (-not (Test-Path .env)) { Copy-Item .env.example .env }
 ```
 
-Set GROQ_API_KEY in .env using a key from [Groq Console](https://console.groq.com/keys). The local .env file is ignored by Git; the template contains no credentials. GROQ_MODEL defaults to openai/gpt-oss-20b, subject to account access and current provider limits. Keep the account on the Free tier for the initial setup.
+Set GROQ_API_KEY in .env using a key from [Groq Console](https://console.groq.com/keys). The local .env file is ignored by Git; the template contains a blank provider key and a local-development database password. GROQ_MODEL defaults to openai/gpt-oss-20b, subject to account access and current provider limits. Keep the account on the Free tier for the initial setup.
 
 From the repository root, run:
 
@@ -113,7 +117,7 @@ The model can choose either tool, inspect its result, and optionally request one
 
 Log snapshots are limited to 64,000 file bytes, 20 unique log observations, timezone-aware timestamps, and 2,000 content characters per observation. The existing enriched-incident byte limit still applies. Omit `--logs-file` to keep the health-only behavior. Records include the normalized log snapshot hash when configured and actual returned log text when requested. See the [live two-tool selection review](docs/validation/log-tool-2026-10-28.md). Rebuild the Docker image after source changes; [container instructions](docs/containers.md) explain the extra option.
 
-The [graph design](docs/langgraph.md) documents nodes, state/reducers, branching, counters, and repeated-request handling. Records include graph_steps, LangGraph version, and completed-run counts/stop reason. The [live graph observation](docs/validation/langgraph-2026-10-29.md) preserves actual execution and semantic limitations. Each invocation starts fresh: durable checkpoint storage and pause/resume are not implemented. Reinstall development dependencies and rebuild Docker images after this dependency/code change.
+The [graph design](docs/langgraph.md) documents nodes, state/reducers, branching, counters, and repeated-request handling. One-shot records include graph_steps, LangGraph version, and completed-run counts/stop reason. The [live graph observation](docs/validation/langgraph-2026-10-29.md) preserves actual execution and semantic limitations. Each one-shot invocation starts fresh; use the [PostgreSQL lifecycle](docs/checkpoint-resume.md) for durable pause/resume. Reinstall development dependencies and rebuild Docker images after dependency/code changes.
 
 ## Diagnose an incident from Python
 
@@ -165,7 +169,7 @@ The image uses a digest-pinned Python base, pinned runtime dependencies, and a n
 
 ## Tests
 
-The [CI workflow](.github/workflows/ci.yml) runs on every push and pull request, including draft PRs. It checks Linux with Python 3.12/3.13 and Windows with Python 3.13. Each job installs pinned dependencies, lints the backend, builds the source distribution and wheel, installs that wheel, checks dependencies, and runs the offline test suite. An additional smoke check runs the installed CLI outside the checkout. A Linux container job builds the runtime image and checks non-root execution, dependencies, CLI help, mounted input, and error-record writing without credentials or container network access. The stable `CI gate` check succeeds only when the entire matrix and container job succeed. See [Actions runs](https://github.com/Danven-Ong/IncidentClue/actions) for actual results.
+The [CI workflow](.github/workflows/ci.yml) runs on every push and pull request, including draft PRs. It checks Linux with Python 3.12/3.13 and Windows with Python 3.13. Backend jobs install pinned dependencies, lint, build and install the package wheel, check dependencies and run offline tests. PostgreSQL jobs on Linux 3.12/3.13 exercise real checkpoints, process crashes and concurrency with fake provider transports. A container job checks runtime identity, one-shot commands without networking, and durable Compose storage across a PostgreSQL restart. `CI gate` requires all three job groups. See [Actions runs](https://github.com/Danven-Ong/IncidentClue/actions) for actual results.
 
 CI uses no provider secrets and makes no intentional live LLM requests; model/provider interactions in tests use fake transports. Package downloads still require network access. Live synthetic evaluations are separate, deliberate runs. Workflow actions are pinned to commit SHAs, repository permissions are read-only, and checkout credentials are not persisted.
 

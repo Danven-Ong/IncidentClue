@@ -4,7 +4,7 @@ IncidentClue is designed as a web application with a modular Python backend. It 
 
 ## Current implementation
 
-The backend implements input/output models, a citation-membership guard, Groq connectivity, single-request diagnosis, and a bounded LangGraph health/log investigation. The CLI exposes both flows with local run records. Offline tests exercise the installed SDK through a fake HTTP transport. Live diagnosis and graph execution succeeded; actual paths and semantic limitations are recorded. The HTTP API, frontend, database, durable checkpoint recovery, and broader evaluation remain pending.
+The backend implements input/output models, a citation-membership guard, Groq connectivity, single-request diagnosis, a bounded LangGraph health/log investigation, and durable PostgreSQL checkpoint/pause/resume. The CLI exposes one-shot flows with local run records and durable flows with database lifecycle records. Offline tests exercise the installed SDK through fake HTTP transports and recovery against real PostgreSQL. Historical live diagnosis/graph paths and semantic limitations are recorded. The HTTP API, frontend and broader evaluation remain pending.
 
 ## Incident input contract
 
@@ -62,7 +62,7 @@ The command prints only Diagnosis JSON to stdout and uses stderr for errors and 
 
 ## Read-only investigation graph
 
-investigation.py defines a LangGraph StateGraph with decide, execute, diagnose, and validate nodes. Conditional edges return to decision after the first lookup or route directly to diagnosis after two attempts. Counters enforce at most two tool attempts, two selection requests, and one final request; a recursion guard is secondary. Clients remain outside state. Input, tool arguments, scope, output, and citation checks reuse existing code. No automatic retries, checkpoint/resume, or persistent graph memory are configured.
+investigation.py defines a LangGraph StateGraph with decide, execute, diagnose, and validate nodes. Conditional edges return to decision after the first lookup or route directly to diagnosis after two attempts. Counters enforce at most two tool attempts, two selection requests, and one final request; a recursion guard is secondary. Clients remain outside state. Input, tool arguments, scope, output, and citation checks reuse existing code. One-shot invocations have no checkpointer; the durable lifecycle supplies a PostgreSQL checkpointer and attempt guard. Automatic retries remain disabled.
 
 State keeps the original input, merged evidence, bounded tool history/conversation, counts, pending call, stop reason, and final result. Custom reducers skip identical evidence, reject conflicting IDs, and bound tool history. Repeated validated requests (UTC-normalized for log windows) are not executed again; the graph returns a controlled tool error and diagnoses existing evidence. Provider failures remain errors. Tool-result exchanges carry matching call IDs; final generation offers no tools. See [graph design and boundaries](langgraph.md) and [actual graph run](validation/langgraph-2026-10-29.md).
 
@@ -123,6 +123,28 @@ The root compose.yaml adds a one-off CLI convenience service over the same image
 backend/Dockerfile builds a backend wheel and downloads pinned runtime dependency wheels in a builder stage. A separate runtime stage installs only those wheels and runs the CLI as UID/GID 10001. The official Python base is pinned by a multi-platform manifest digest; runtime and development snapshots remain separate. The root .dockerignore allowlists backend packaging/source inputs, excluding environment files, fixtures, host caches, Git, and run output. Configuration/input files are explicitly mounted at execution time; a named output volume retains local records across disposable containers. See [container usage](containers.md).
 
 The CI container job verifies a Linux amd64 build, runtime identity, absent development tools, dependency compatibility, CLI startup, and mounted-input/error-record behavior with networking disabled. CI gate depends on both the Python matrix and container job. A container improves runtime repeatability but does not make stochastic model responses deterministic, provide live monitoring, prove cross-architecture compatibility, or deploy the app. Docker was not available in the implementation shell; actual container verification runs on GitHub's Linux runner. Image publishing and deployment are deferred until their destination and release policy are defined.
+
+## Durable execution boundary
+
+The [PostgreSQL lifecycle](checkpoint-resume.md) adds `start`, `inspect`, `pause`
+and `resume` over the shared graph. `lifecycle.py` owns transitions and compatibility;
+`persistence.py` owns database connections, session execution locks and a charged
+attempt ledger. `PostgresSaver` persists graph boundaries with synchronous
+durability. The CLI is one client of this service; HTTP/frontend are deferred.
+
+Validated incident/snapshot contents and model settings survive removal of source
+files. Source/dependency fingerprints prevent execution of incompatible saved state.
+Clients and credentials are recreated at runtime. App lifecycle records and graph
+checkpoints use separate tables/connections, so recovery reconciles their progress.
+An output committed to the attempt ledger can be replayed into the graph without
+another request. A reservation with no saved output is ambiguous and blocks resume.
+These boundaries preserve charged budgets without claiming exactly-once calls.
+
+The optional `durable` Compose profile adds a local PostgreSQL service with a
+healthcheck and its own named data volume. PostgreSQL CI jobs run real database,
+process-death, concurrency and budget tests with fake model transports. The CI
+gate now also requires these jobs; container CI checks saved state across a
+PostgreSQL restart. Docker Desktop is available for local checks for this feature.
 
 ## Evaluation boundary
 

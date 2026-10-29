@@ -3,6 +3,7 @@
 import argparse
 from datetime import datetime, timezone
 import hashlib
+import json
 from importlib.metadata import version
 import os
 from pathlib import Path
@@ -41,6 +42,51 @@ MAX_INPUT_FILE_BYTES = 64_000
 
 class IncidentFileError(ValueError):
     """The supplied incident file cannot be read or validated."""
+
+
+def _durable_command(args) -> int:
+    from incidentclue.lifecycle import Lifecycle
+    from incidentclue.persistence import InvestigationBusy, PersistenceError, open_database
+
+    try:
+        _load_environment(args.env_file)
+        with open_database(os.environ.get("INCIDENTCLUE_DATABASE_URL", "")) as db:
+            if args.command == "db-init":
+                db.initialize()
+                print(json.dumps({"database": "initialized"}))
+                return 0
+            service = Lifecycle(db)
+            if args.command == "start":
+                incident = _load_incident(args.incident)
+                health = load_health_snapshot(args.health_file)
+                logs = load_log_snapshot(args.logs_file) if args.logs_file is not None else None
+                model = args.model if args.model is not None else os.environ.get("GROQ_MODEL", DEFAULT_MODEL)
+                identifier = service.start(incident, health, model, logs=logs, paused=args.paused)
+                # Print identity before executing: a failure must remain inspectable.
+                print(f"Investigation ID: {identifier}", file=sys.stderr, flush=True)
+                if args.paused:
+                    view = service.inspect(identifier)
+                else:
+                    view = service.resume(identifier, lambda: create_groq_client(os.environ.get("GROQ_API_KEY", "")),
+                                          pause_after=args.pause_after)
+            elif args.command == "resume":
+                view = service.resume(args.id, lambda: create_groq_client(os.environ.get("GROQ_API_KEY", "")),
+                                      pause_after=args.pause_after)
+            elif args.command == "pause":
+                view = service.pause(args.id)
+            else:
+                view = service.inspect(args.id)
+            print(json.dumps(view, indent=2))
+            return 0
+    except (IncidentFileError, InputLimitError, ConfigurationError) as error:
+        print(str(error), file=sys.stderr)
+        return 2
+    except InvestigationBusy as error:
+        print(str(error), file=sys.stderr)
+        return 4
+    except PersistenceError as error:
+        print(str(error), file=sys.stderr)
+        return 1
 
 
 def _load_incident(path: Path) -> Incident:
@@ -94,7 +140,25 @@ def main(argv: list[str] | None = None) -> int:
                                  help="Explicit synthetic health snapshot; no live probes.")
             command.add_argument("--logs-file", type=Path,
                                  help="Optional synthetic log snapshot; enables get_logs.")
+    from incidentclue.lifecycle import NODES
+    for name in ("db-init", "start", "inspect", "pause", "resume"):
+        command = commands.add_parser(name, help=f"Durable investigation: {name}.")
+        command.add_argument("--env-file", type=Path, help="Explicit local configuration file.")
+        if name == "start":
+            command.add_argument("incident", type=Path)
+            command.add_argument("--health-file", type=Path, required=True)
+            command.add_argument("--logs-file", type=Path)
+            command.add_argument("--model")
+            pause_options = command.add_mutually_exclusive_group()
+            pause_options.add_argument("--paused", action="store_true", help="Persist initial state without model calls.")
+            pause_options.add_argument("--pause-after", choices=NODES, help="Pause after a committed node.")
+        elif name != "db-init":
+            command.add_argument("id", help="Stable investigation UUID.")
+            if name == "resume":
+                command.add_argument("--pause-after", choices=NODES, help="Pause after a committed node.")
     args = parser.parse_args(argv)
+    if args.command in ("db-init", "start", "inspect", "pause", "resume"):
+        return _durable_command(args)
 
     started = perf_counter()
     run_id = str(uuid4())
