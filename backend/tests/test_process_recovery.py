@@ -10,7 +10,9 @@ import time
 import pytest
 
 from incidentclue.lifecycle import Lifecycle
-from incidentclue.persistence import InvestigationBusy, RecoveryRequired
+from incidentclue.persistence import InvestigationBusy, PersistenceError, RecoveryRequired
+from incidentclue.schemas import Incident
+from incidentclue.tools import load_health_snapshot
 from test_lifecycle import responses
 from test_investigation import fake_client
 
@@ -157,3 +159,57 @@ def test_concurrent_resume_rejected_and_external_pause_honored(db, worker):
         if process.poll() is None:
             process.kill()
             process.communicate(timeout=5)
+
+
+def test_cached_selection_output_replays_without_an_extra_model_request(db, worker):
+    run, _, requests, incident_path, health_path = worker
+    service = Lifecycle(db)
+    identifier = service.start(Incident.model_validate_json(incident_path.read_text()),
+                               load_health_snapshot(health_path), paused=True)
+    assert run("resume", identifier, crash="after_output").returncode == 73
+    wait_for_disconnect(db, identifier)
+    cached = service.resume(identifier, lambda: pytest.fail("cached selection requested a client"),
+                            pause_after="decide")
+    assert cached["next_nodes"] == ["execute"]
+    assert cached["charged"] == {"model": 1, "tool": 0}
+    done = output(run("resume", identifier))
+    assert done["status"] == "completed" and len(requests.read_text().splitlines()) == 3
+
+
+def test_cached_final_output_can_complete_without_provider_credentials(db, worker):
+    run, _, requests, _, _ = worker
+    first = output(run("start", boundary="execute"))
+    identifier = first["investigation_id"]
+    assert output(run("resume", identifier, boundary="decide"))["next_nodes"] == ["diagnose"]
+    assert run("resume", identifier, crash="after_output").returncode == 73
+    wait_for_disconnect(db, identifier)
+    done = Lifecycle(db).resume(identifier, lambda: pytest.fail("cached diagnosis requested a client"))
+    assert done["status"] == "completed" and done["charged"] == {"model": 3, "tool": 1}
+    assert len(requests.read_text().splitlines()) == 3
+
+
+def test_death_during_tool_keeps_tool_reservation_and_refuses_replay(db, worker):
+    run, _, requests, _, _ = worker
+    identifier = output(run("start", boundary="decide"))["investigation_id"]
+    assert run("resume", identifier, crash="during_tool").returncode == 77
+    wait_for_disconnect(db, identifier)
+    service = Lifecycle(db)
+    with pytest.raises(RecoveryRequired, match="uncertain"):
+        service.resume(identifier, lambda: pytest.fail("uncertain tool continued"))
+    view = service.inspect(identifier)
+    assert view["status"] == "recovery_required" and view["charged"] == {"model": 1, "tool": 1}
+    assert len(requests.read_text().splitlines()) == 1
+
+
+def test_known_failure_survives_death_before_application_status_update(db, worker):
+    run, _, requests, incident_path, health_path = worker
+    service = Lifecycle(db)
+    identifier = service.start(Incident.model_validate_json(incident_path.read_text()),
+                               load_health_snapshot(health_path), paused=True)
+    assert run("resume", identifier, crash="after_failure").returncode == 78
+    wait_for_disconnect(db, identifier)
+    with pytest.raises(PersistenceError, match="earlier attempt failed"):
+        service.resume(identifier, lambda: pytest.fail("failed attempt replayed"))
+    view = service.inspect(identifier)
+    assert view["status"] == "failed" and view["charged"] == {"model": 1, "tool": 0}
+    assert len(requests.read_text().splitlines()) == 1

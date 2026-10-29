@@ -28,6 +28,8 @@ def provider():
         mode = os.environ.get("WORKER_CRASH")
         if mode == "during":
             os._exit(71)
+        if mode == "after_failure":
+            return httpx2.Response(429, json={"error": {"message": "Synthetic provider failure"}})
         if mode == "hold":
             Path(os.environ["WORKER_ENTERED"]).touch()
             deadline = time.monotonic() + 20
@@ -87,6 +89,11 @@ def main():
             identifier = service.start(incident, health, "saved-model", paused=True)
         else:
             identifier = sys.argv[2]
+        if crash == "during_tool":
+            from incidentclue import investigation
+            def tool(*args, **kwargs):
+                os._exit(77)
+            investigation.get_service_health = tool
         if crash in ("before", "after_output"):
             original = db.run_node
             def crash_node(*args):
@@ -95,11 +102,14 @@ def main():
                 original(*args)
                 os._exit(73)
             db.run_node = crash_node
-        if crash == "after_final":
+        if crash in ("after_final", "after_failure"):
             original_status = db.status
             def status(identifier, value, error_code=None):
                 if value == "completed":
-                    os._exit(74)
+                    if crash == "after_final":
+                        os._exit(74)
+                elif value == "failed" and crash == "after_failure":
+                    os._exit(78)
                 original_status(identifier, value, error_code)
             db.status = status
         if command == "inspect":

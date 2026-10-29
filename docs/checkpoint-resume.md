@@ -18,7 +18,9 @@ Use an explicit `--env-file` or process environment for `INCIDENTCLUE_DATABASE_U
 Database credentials are runtime configuration, never graph state.
 
 - `db-init` explicitly initializes application and supported PostgreSQL checkpointer
-  tables; repeated initialization is safe. Normal commands never silently migrate.
+  tables; repeated initialization is safe. An incompatible existing application
+  schema is rejected before its version records or application tables are changed.
+  Normal commands never silently migrate.
 - `start` validates incident, synthetic snapshots and model, assigns a fresh UUID,
   and durably saves inputs/settings before execution. This investigation ID is
   also the LangGraph thread ID, distinct from the user-supplied incident ID.
@@ -43,6 +45,8 @@ Execution is synchronous in the start/resume process. Statuses are `ready`,
 session advisory lock, held by the executing process, rejects concurrent resumes.
 Lock release on process death allows recovery; a stale `running` status is not
 proof of a live executor. Inspect reports execution ownership separately.
+Ownership inspection reads PostgreSQL's lock catalog without acquiring an
+execution lock, so inspection does not temporarily reject a real executor.
 PostgreSQL may observe a socket disconnect shortly after the local process exits;
 until then a resume correctly reports busy. Retry the command after ownership is
 released; the busy command executes no nodes or provider calls.
@@ -178,6 +182,8 @@ python -m pytest backend/tests -m postgres -q
 Tests retain uniquely identified test investigations in that selected database.
 They use real PostgreSQL and fake SDK transports, including separate-process
 restart, uncertain-call refusal, cached-output replay and concurrent resume/pause.
+Crash cases include cached selection/final model output, interruption inside a
+tool, and a known failed attempt whose application-status update was lost.
 Without that variable, database tests skip and the existing offline suite runs.
 
 ## References

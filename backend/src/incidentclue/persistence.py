@@ -100,10 +100,14 @@ class Database:
     def initialize(self) -> None:
         self.connection.execute("SELECT pg_advisory_lock(%s)", (INIT_LOCK,))
         try:
-            self.connection.execute("""
-                CREATE TABLE IF NOT EXISTS ic_schema (version integer PRIMARY KEY);
-                INSERT INTO ic_schema VALUES (1) ON CONFLICT DO NOTHING;
-                CREATE TABLE IF NOT EXISTS ic_investigations (
+            with self.connection.transaction():
+                self.connection.execute("CREATE TABLE IF NOT EXISTS ic_schema (version integer PRIMARY KEY)")
+                versions = self.connection.execute("SELECT version FROM ic_schema ORDER BY version").fetchall()
+                if versions and versions != [{"version": SCHEMA_VERSION}]:
+                    raise PersistenceError("Database schema version is incompatible; automatic migration is disabled.")
+                self.connection.execute("INSERT INTO ic_schema VALUES (%s) ON CONFLICT DO NOTHING", (SCHEMA_VERSION,))
+                self.connection.execute("""
+                    CREATE TABLE IF NOT EXISTS ic_investigations (
                     id uuid PRIMARY KEY,
                     status text NOT NULL CHECK (status IN
                         ('ready','running','paused','completed','failed','recovery_required')),
@@ -122,8 +126,8 @@ class Database:
                     output jsonb,
                     PRIMARY KEY (investigation_id, operation)
                 );
-            """, prepare=False)
-            self.require_initialized()
+                """, prepare=False)
+                self.require_initialized()
             self.saver.setup()
         finally:
             self.connection.execute("SELECT pg_advisory_unlock(%s)", (INIT_LOCK,))
@@ -163,13 +167,17 @@ class Database:
                 self.connection.execute("SELECT pg_advisory_unlock(%s)", (lock_key(identifier),))
 
     def is_executing(self, identifier: str) -> bool:
-        # Probe using this fresh command connection. Never called by the owner.
-        acquired = self.connection.execute(
-            "SELECT pg_try_advisory_lock(%s) AS acquired", (lock_key(identifier),),
-        ).fetchone()["acquired"]
-        if acquired:
-            self.connection.execute("SELECT pg_advisory_unlock(%s)", (lock_key(identifier),))
-        return not acquired
+        # Inspect ownership without taking a lock that could reject a real resume.
+        # PostgreSQL exposes bigint advisory keys as unsigned high/low OID halves.
+        key = lock_key(identifier)
+        return self.connection.execute("""
+            SELECT EXISTS (
+                SELECT 1 FROM pg_locks
+                WHERE locktype='advisory' AND granted AND objsubid=1
+                  AND database=(SELECT oid FROM pg_database WHERE datname=current_database())
+                  AND classid=%s::oid AND objid=%s::oid
+            ) AS executing
+        """, ((key >> 32) & 0xFFFFFFFF, key & 0xFFFFFFFF)).fetchone()["executing"]
 
     def status(self, identifier: str, status: str, error_code: str | None = None) -> None:
         if self.owner != identifier:
