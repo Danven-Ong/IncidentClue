@@ -91,6 +91,92 @@ attempts. Concurrent requests and pause/completion races have explicit tests.
    compatibility, package build, Linux/Windows and container/Compose CI pass at
    the final feature head. Routine tests use a fake provider, never a live key.
 
+## Local usage
+
+Run these commands from the repository root with the installed environment active.
+On Windows, activate `.venv/Scripts/Activate.ps1`; on macOS/Linux use
+`source .venv/bin/activate`. Keep existing `.env` contents: if it predates this
+feature, add the database settings from `.env.example` without overwriting your key.
+
+```sh
+docker compose --profile durable up -d --wait postgres
+incidentclue db-init --env-file .env
+incidentclue start data/synthetic/checkout-startup.json --health-file data/synthetic/checkout-health.json --logs-file data/synthetic/checkout-logs.json --paused --env-file .env
+```
+
+`--paused` needs no provider key. Copy the printed investigation UUID, then:
+
+```sh
+incidentclue inspect YOUR_UUID --env-file .env
+incidentclue resume YOUR_UUID --pause-after execute --env-file .env
+incidentclue inspect YOUR_UUID --env-file .env
+incidentclue resume YOUR_UUID --env-file .env
+```
+
+The first resume may pause after a lookup. A model can choose no lookup, in which
+case it completes without reaching `execute`. Resuming invokes the saved model;
+changing `GROQ_MODEL` or editing the original input files does not replace saved
+settings. A compatible runtime and current `GROQ_API_KEY` are required for new
+model calls. From another terminal, `incidentclue pause YOUR_UUID --env-file .env`
+requests a cooperative stop while execution is in progress.
+
+Durable command stdout is a JSON inspection envelope, including diagnosis under
+`state.diagnosis` when completed. The newly assigned ID is also printed to stderr
+before execution so a failed run can be inspected. Exit codes are 0 for successful
+operations (including pause/inspection), 1 for lifecycle/database/execution errors,
+2 for input/configuration errors and 4 for an investigation already executing.
+An `inspect` of a failed investigation is a successful read; check its `status`.
+The one-shot commands keep their previous Diagnosis output and exit codes.
+
+## Compose client and storage
+
+The existing `incidentclue` Compose service remains the one-shot client. The
+`durable` profile adds PostgreSQL and a database-connected CLI service:
+
+```sh
+docker compose build durable
+docker compose run --rm durable db-init
+docker compose run --rm durable start /inputs/checkout-startup.json --health-file /inputs/checkout-health.json --paused
+docker compose run --rm durable inspect YOUR_UUID
+docker compose run --rm durable resume YOUR_UUID --env-file /config/provider.env
+```
+
+The host CLI connects to localhost port 55432 by default; the Compose client
+connects to `postgres:5432`. `INCIDENTCLUE_COMPOSE_DATABASE_URL` overrides the
+container URI; update it as well as `INCIDENTCLUE_DATABASE_URL` if you change the
+example database/user/password. URI-encode special characters in credentials.
+Provider configuration is a read-only mount and is loaded only with `--env-file`.
+The DB is published only on localhost. The documented password is for local
+development. PostgreSQL is not deployed or exposed as a public service.
+
+Checkpoints and app tables live in the project's `postgres-data` named volume;
+one-shot JSON records remain in the separate `runs` volume. `docker compose down`
+keeps these volumes. `docker compose down -v` destroys stored investigations and
+records; do not use it to pause work. Credentials and connection objects are not
+stored in graph state, but original inputs, conversations and model/tool results
+are retained intentionally. There is no automatic retention cleanup or backup
+service in this PR. Treat the local database as trusted application storage.
+
+The `ic_schema`, `ic_investigations`, and `ic_attempts` tables are application-owned;
+the checkpointer owns its checkpoint/migration tables. PostgreSQL session locks
+require a direct connection or a session-preserving pool, not transaction pooling.
+Inspection consists of several reads and may observe an advancing investigation;
+it is not an atomic snapshot of all app and checkpoint tables while execution runs.
+
+## Offline database tests
+
+Use a separate Compose project/database for testing. Configure
+`INCIDENTCLUE_TEST_DATABASE_URL` explicitly, then run:
+
+```sh
+python -m pytest backend/tests -m postgres -q
+```
+
+Tests retain uniquely identified test investigations in that selected database.
+They use real PostgreSQL and fake SDK transports, including separate-process
+restart, uncertain-call refusal, cached-output replay and concurrent resume/pause.
+Without that variable, database tests skip and the existing offline suite runs.
+
 ## References
 
 - [LangGraph checkpointers and synchronous durability](https://docs.langchain.com/oss/python/langgraph/checkpointers)

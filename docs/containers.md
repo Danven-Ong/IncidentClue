@@ -19,7 +19,7 @@ docker compose run --build --rm incidentclue --help
 docker compose run --rm incidentclue
 ```
 
-The help command does not call Groq, though building downloads images/packages and the configured mount files must exist. Rebuild when code/dependencies change; `--build` uses Docker's cache for unchanged layers. `run` is appropriate for this short-lived CLI. No long-running API or database service has been introduced.
+The help command does not call Groq, though building downloads images/packages and the configured mount files must exist. Rebuild when code/dependencies change; `--build` uses Docker's cache for unchanged layers. `run` is appropriate for this short-lived CLI. The optional [durable profile](checkpoint-resume.md) adds PostgreSQL and a separate database-connected CLI service; no long-running API is introduced.
 
 Compose records persist in the named volume `incidentclue-compose-runs`. Earlier manual `docker run` records remain in their separate `incidentclue-runs` volume; Compose does not migrate or delete them. List Compose records using the saved mounts:
 
@@ -103,6 +103,6 @@ In Windows Git Bash, prefix that command with `MSYS_NO_PATHCONV=1` too. Bind-mou
 
 The root `.dockerignore` allowlists only backend source and required packaging files. Credentials, Git history, host environments, tests, docs, frontend files, incident fixtures, and run records are excluded from the build context. Inputs and outputs are supplied at runtime. The image runs as UID/GID 10001 and supports a read-only root filesystem with writable output storage mounted separately.
 
-CI builds and smokes the Linux image, verifies non-root execution and dependency compatibility, and tests mounted input/error-record writing with no credentials and `--network none`. The aggregate CI gate requires both the Python matrix and container job. This does not verify live Groq connectivity, Docker Desktop integration, or every CPU architecture. The initial CI image check targets the GitHub runner's Linux amd64 architecture. A manifest supporting other architectures is not evidence that all pinned Python wheels exist or have been tested there.
+CI builds and smokes the Linux image, verifies non-root execution and dependency compatibility, and tests one-shot mounted input/error-record writing with no credentials and `--network none`. A separate Compose check connects to PostgreSQL and verifies saved state across its restart without a provider key. The aggregate CI gate requires the Python matrix, container job and PostgreSQL recovery jobs. These checks do not verify live Groq connectivity or every CPU architecture. The CI image targets Linux amd64; a multi-platform manifest alone does not prove every architecture has compatible wheels.
 
-Docker was unavailable in the implementation shell; use the linked Actions run for actual container verification and run the local commands on your Docker-equipped machine. Images are built for validation only; publishing, deployment, and rollback automation remain separate increments.
+Docker Desktop is available for local verification of this feature, in addition to CI. Images are built for validation only; publishing, deployment, and rollback automation remain separate increments.

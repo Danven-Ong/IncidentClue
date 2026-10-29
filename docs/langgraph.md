@@ -50,7 +50,13 @@ Records include LangGraph version, actual node sequence, tool events, and comple
 
 ## Persistence and evaluation
 
-No checkpointer or persistent store is configured. Every invocation starts fresh. JSON records and Docker volumes do not provide execution resumption. Durable pause/resume, storage retention, and duplicate-safe accounting across crashes are separate work; this implementation provides no exactly-once guarantee across restarts.
+The one-shot `investigate` command still compiles without a checkpointer and starts
+fresh. The durable `start`/`resume` lifecycle uses this same graph with PostgreSQL
+checkpoints and an application attempt ledger. JSON run records alone do not
+provide execution resumption. See the [durable lifecycle](checkpoint-resume.md)
+for deliberate pause boundaries, configuration compatibility, charged attempts,
+and refusal to replay uncertain requests. Neither path promises exactly-once
+physical execution across a crash.
 
 Tests cover two-lookup routing, budget stopping, early stopping, repeated/equivalent queries, merging/conflicts, failures, provenance, and final validation. One [live graph observation](validation/langgraph-2026-10-29.md) selected logs and then stopped after one lookup. It demonstrates that path, not general quality or reliable two-step model behavior. Python enforces executable permissions; textual advice still needs review.
 
