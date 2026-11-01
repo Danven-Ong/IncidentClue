@@ -46,7 +46,7 @@ services:
           create_host_path: false
     command: ["--help"]
 
-  web:
+  storage-setup:
     image: incidentclue:local
     profiles: [web, frontend]
     build:
@@ -58,15 +58,27 @@ services:
         condition: service_healthy
     environment:
       INCIDENTCLUE_DATABASE_URL: ${INCIDENTCLUE_COMPOSE_DATABASE_URL:-postgresql://incidentclue:local-development-only@postgres:5432/incidentclue}
+    entrypoint: [python, -m, incidentclue.api.storage_setup]
+    command: []
+
+  web:
+    image: incidentclue:local
+    profiles: [web, frontend]
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    read_only: true
+    depends_on:
+      postgres:
+        condition: service_healthy
+      storage-setup:
+        condition: service_completed_successfully
+    environment:
+      INCIDENTCLUE_DATABASE_URL: ${INCIDENTCLUE_COMPOSE_DATABASE_URL:-postgresql://incidentclue:local-development-only@postgres:5432/incidentclue}
+      GROQ_API_KEY: ${GROQ_API_KEY:-}
+      GROQ_MODEL: ${GROQ_MODEL:-openai/gpt-oss-20b}
     ports:
       - "127.0.0.1:${INCIDENTCLUE_WEB_PORT:-8000}:8000"
-    volumes:
-      - type: bind
-        source: ./.env
-        target: /config/provider.env
-        read_only: true
-        bind:
-          create_host_path: false
     entrypoint: [python, -m, uvicorn]
     command:
       - incidentclue.api.app:create_app
@@ -75,8 +87,6 @@ services:
       - 0.0.0.0
       - --port
       - "8000"
-      - --env-file
-      - /config/provider.env
       - --no-access-log
     healthcheck:
       test: [CMD, python, -c, "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=5).close()"]

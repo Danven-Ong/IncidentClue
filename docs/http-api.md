@@ -71,7 +71,11 @@ Providers are created lazily: create, inspect, pause and completed resume work
 without a model key. HTTP status reports the operation, not diagnostic certainty.
 Synthetic observations and model hypotheses are not production-quality guarantees.
 
-Storage initialization is explicit (`incidentclue db-init`). Health checks read
+Direct Uvicorn users initialize storage explicitly (`incidentclue db-init` or
+`python -m incidentclue.api.storage_setup` with database environment configured).
+Compose web/frontend startup instead runs a separate `storage-setup` prerequisite
+without invoking the CLI. It initializes fresh storage, preserves compatible
+existing data, and refuses incompatible schema versions. Health checks read
 both application and checkpoint tables without migrations, writes or model calls.
 The server stays available to report 503 during an outage and recovers on later
 requests when storage returns. Readiness does not validate provider credentials.
@@ -120,26 +124,27 @@ read state; POST its `/resume` suffix to continue, or `/pause` to request a stop
 from another client. Supplying recorded health/log evidence uses the same JSON
 models as `data/synthetic/checkout-health.json` and `checkout-logs.json`.
 
-For the container service, the explicit CLI initialization can instead run in
-Compose. The host CLI uses localhost:55432; the Compose CLI/API use postgres:5432:
+For the container service, no manual CLI setup is needed. The host CLI uses
+localhost:55432; Compose services use postgres:5432:
 
 ```sh
-docker compose build web
-docker compose run --rm durable db-init
-docker compose --profile web up -d --wait web
+docker compose --profile web up --build -d --wait web
 ```
 
 The API is published at `http://127.0.0.1:8000`; override `INCIDENTCLUE_WEB_PORT`
-if occupied. PostgreSQL uses the existing `postgres-data` volume. `.env` is a
-read-only provider configuration mount; the container DSN comes from the Compose
-environment and takes precedence over any host DSN in that file. Override
+if occupied. PostgreSQL uses the existing `postgres-data` volume. The web service
+does not require or mount `.env`. Compose optionally reads server-only provider
+settings from the shell or root `.env`; its container DSN comes from the Compose
+environment independently of a host CLI DSN. Override
 `INCIDENTCLUE_COMPOSE_DATABASE_URL` when changing the database/user/password.
-Provider/model settings are loaded at server creation; restart the server to
-apply changes. Saved investigations retain their original model.
+Provider/model settings are loaded at server creation. After changing shell or
+root `.env` settings, rerun the Compose startup command so it recreates the web
+service with the updated environment. Saved investigations retain their model.
 
 `docker compose --profile web stop web postgres` stops work while retaining
 volumes. Never use `down -v` to pause work: it deletes stored investigations.
-Starting the web service against uninitialized storage reports unhealthy/503;
-run explicit db-init, then retry readiness. Health does not need a provider key.
+Direct Uvicorn against uninitialized storage reports503; it never initializes
+storage itself. Compose waits for its setup job to exit successfully first.
+Health does not need a provider key.
 Long resumes occupy a worker thread and two DB connections; thread capacity is
 finite. This local service has no throughput claim or public-access controls.

@@ -30,6 +30,15 @@ container with the same prefix mapping. Both strip `/api` before forwarding;
 CORS remains disabled. Host bindings enforce local-only access. The frontend
 build context contains only frontend inputs, never the backend environment file.
 
+Compose startup is one command: `docker compose --profile frontend up --build -d
+--wait frontend`. PostgreSQL readiness precedes a separate one-shot storage setup
+process; successful setup precedes API startup, and API readiness precedes the
+frontend. This process uses the storage initializer directly, not the CLI. A root
+`.env` is optional for website startup; provider credentials are needed only for
+new execution, not create/inspect. Existing schema versions are checked before
+setup, and incompatible storage refuses automatic upgrade. The API process and
+its health endpoint remain read-only with respect to schema initialization.
+
 Create saves a UUID and paused checkpoint at zero attempts. A separate Resume
 request executes synchronously in a backend worker thread. Inspection and Pause
 use independent requests and remain available while Resume is outstanding.

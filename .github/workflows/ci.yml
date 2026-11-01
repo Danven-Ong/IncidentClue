@@ -193,6 +193,17 @@ jobs:
           '
           docker compose --profile frontend down
 
+      - name: Verify fresh one-command startup without CLI or an environment-file mount
+        run: |
+          docker compose -p incidentclue-startup-ci --env-file .env.example --profile frontend up --build -d --wait frontend
+          python backend/tests/compose_api_smoke.py http://127.0.0.1:8080/api /tmp/one-command-created.json create
+          docker compose -p incidentclue-startup-ci --env-file .env.example --profile frontend up -d --wait frontend
+          python backend/tests/compose_api_smoke.py http://127.0.0.1:8080/api /tmp/one-command-created.json inspect
+          docker compose -p incidentclue-startup-ci --env-file .env.example --profile frontend restart postgres web frontend
+          docker compose -p incidentclue-startup-ci --env-file .env.example --profile frontend up -d --wait frontend
+          python backend/tests/compose_api_smoke.py http://127.0.0.1:8080/api /tmp/one-command-created.json inspect
+          docker compose -p incidentclue-startup-ci --env-file .env.example --profile frontend down
+
   postgres:
     name: PostgreSQL recovery (Python ${{ matrix.python }})
     runs-on: ubuntu-latest

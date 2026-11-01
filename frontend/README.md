@@ -24,21 +24,36 @@ frontend env file is loaded. Never pass credentials as Vite variables.
 
 ## Built local client
 
-From the repository root, with your existing backend `.env` configured:
+With Docker Desktop running, use this one command from the repository root:
 
 ```sh
-docker compose build web frontend
-docker compose --profile frontend up -d --wait postgres
-docker compose run --rm durable db-init
-docker compose --profile frontend up -d --wait frontend
+docker compose --profile frontend up --build -d --wait frontend
 ```
 
 Open `http://127.0.0.1:8080`; `INCIDENTCLUE_FRONTEND_PORT` overrides that port.
+Compose starts PostgreSQL, runs the dedicated `storage-setup` container, then
+starts the API and frontend after their prerequisites succeed. The setup process
+creates fresh tables and exits; it does not invoke the investigation CLI. Repeat
+startup preserves saved investigations. Incompatible schemas stop startup and
+require administrative review; no automatic schema upgrade or reset is performed.
+
+No `.env` file or provider key is required to open the site, create a paused
+investigation or inspect saved work. To execute a new investigation, configure
+`GROQ_API_KEY` on the backend using the shell or an optional root `.env` file;
+Compose reads it without mounting that file into the web container. Optional
+`GROQ_MODEL` is also server-only. Never put provider credentials in frontend
+variables. The CLI remains an optional client, not a website prerequisite.
+After changing provider settings, rerun the startup command so Compose applies
+the updated server environment.
 The frontend container serves the build and proxies `/api` to the existing web
 service. No Node runtime or provider secrets are shipped in that container.
 CORS remains disabled; host ports bind to loopback. This has no public-access
 controls and is not a deployment. `npm run dev` is the development server, not a
 production static server.
+
+For later startups without code changes, `docker compose --profile frontend up
+-d --wait frontend` reuses the images. Run the command with `--build` after code
+changes.
 
 Stop using `docker compose --profile frontend stop frontend web postgres`.
 Volumes are retained. Never use `down -v` to pause work.
