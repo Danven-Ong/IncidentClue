@@ -3,7 +3,7 @@ name: incidentclue
 services:
   postgres:
     image: postgres:17-bookworm@sha256:839fbb5a4942a7758dd93e18b42ea5649807491a0545b5eeeb8f0b8bb11857a5
-    profiles: [durable]
+    profiles: [durable, web]
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-incidentclue}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-local-development-only}
@@ -45,6 +45,45 @@ services:
         bind:
           create_host_path: false
     command: ["--help"]
+
+  web:
+    image: incidentclue:local
+    profiles: [web]
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    read_only: true
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      INCIDENTCLUE_DATABASE_URL: ${INCIDENTCLUE_COMPOSE_DATABASE_URL:-postgresql://incidentclue:local-development-only@postgres:5432/incidentclue}
+    ports:
+      - "127.0.0.1:${INCIDENTCLUE_WEB_PORT:-8000}:8000"
+    volumes:
+      - type: bind
+        source: ./.env
+        target: /config/provider.env
+        read_only: true
+        bind:
+          create_host_path: false
+    entrypoint: [python, -m, uvicorn]
+    command:
+      - incidentclue.api.app:create_app
+      - --factory
+      - --host
+      - 0.0.0.0
+      - --port
+      - "8000"
+      - --env-file
+      - /config/provider.env
+      - --no-access-log
+    healthcheck:
+      test: [CMD, python, -c, "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=5).close()"]
+      interval: 3s
+      timeout: 6s
+      retries: 20
+      start_period: 5s
 
   incidentclue:
     image: incidentclue:local

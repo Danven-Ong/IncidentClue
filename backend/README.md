@@ -1,5 +1,12 @@
 # IncidentClue backend
 
+The package also includes `incidentclue.api.app:create_app`, a FastAPI app factory
+for the shared durable lifecycle. Start it with `python -m uvicorn
+incidentclue.api.app:create_app --factory --host 127.0.0.1 --port 8000 --env-file .env`
+from the repository root. Initialize PostgreSQL explicitly using `incidentclue
+db-init --env-file .env` first. See the repository's `docs/http-api.md` for the
+HTTP contract, Compose setup and recovery limitations. The CLI remains supported.
+
 Python package for structured software-incident diagnosis and bounded read-only investigation. Requires Python 3.12 or newer.
 
 The installed command is `incidentclue`. Run `incidentclue --help` for available commands. Incident JSON and optional synthetic health snapshots are supplied through explicit paths; they are not bundled into the Python package. Provider credentials come from the process environment or an explicit `--env-file` and are never distributed with the package.

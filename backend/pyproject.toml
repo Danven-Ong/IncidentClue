@@ -9,6 +9,8 @@ description = "Evidence-based investigation of software incidents."
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
+    "fastapi>=0.162,<0.163",
+    "uvicorn>=0.54,<0.55",
     "langgraph>=1.2,<2",
     "langgraph-checkpoint-postgres>=3.2,<4",
     "psycopg[binary]>=3.3,<4",
@@ -19,6 +21,7 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = [
+    "httpx>=0.28,<0.29",
     "build>=1.6,<2",
     "httpx2>=2.16,<3",
     "pytest>=8,<10",
