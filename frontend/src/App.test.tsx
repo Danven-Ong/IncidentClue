@@ -52,6 +52,23 @@ describe('incident form', () => {
     await screen.findByRole('heading', { name: 'New incident' });
     expect((screen.getByLabelText('Incident ID') as HTMLInputElement).value).toBe('draft-001');
   });
+  it('does not navigate to a late creation response and requires explicit retry', async () => {
+    let finish: (r: Response) => void = () => {};
+    vi.stubGlobal('fetch', vi.fn((url: string, init: RequestInit) => url.endsWith('/investigations') && init.method === 'POST'
+      ? new Promise<Response>(resolve => { finish = resolve; }) : Promise.resolve(Response.json(inspection()))));
+    render(<App />); const user = userEvent.setup();
+    await user.click(screen.getByRole('button', { name: 'Load synthetic example' }));
+    await user.click(screen.getByRole('button', { name: 'Create incident' }));
+    await user.type(screen.getByLabelText('Investigation UUID'), id);
+    await user.click(screen.getByRole('button', { name: 'Open' }));
+    await screen.findByText('Created paused. No attempts charged. Resume starts execution.');
+    await act(async () => finish(Response.json(inspection({ investigation_id: otherId }))));
+    expect(window.location.hash).toContain(id);
+    await user.click(screen.getByRole('link', { name: 'New incident' }));
+    await screen.findByRole('heading', { name: 'New incident' });
+    expect(screen.getByText(/Creation outcome unknown/)).toBeTruthy();
+    expect((screen.getByRole('button', { name: 'Create incident' }) as HTMLButtonElement).disabled).toBe(true);
+  });
 });
 describe('execution observation', () => {
   it('keeps pause usable during resume and prevents duplicate local resumes', async () => {

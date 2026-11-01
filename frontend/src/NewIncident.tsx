@@ -55,7 +55,8 @@ export function NewIncident({ active }: { active: boolean }) {
     const signal = controller.current?.signal;
     try {
       const value = await api.create(body, signal);
-      if (!signal?.aborted) { setForm(defaults); setUnknown(false); openInvestigation(value.investigation_id); }
+      if (signal?.aborted) setUnknown(true);
+      else { setForm(defaults); setUnknown(false); openInvestigation(value.investigation_id); }
     }
     catch (error) {
       if (signal?.aborted) { setUnknown(true); return; }
