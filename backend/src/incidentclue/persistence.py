@@ -23,13 +23,49 @@ INIT_LOCK = 470948371522
 class PersistenceError(RuntimeError):
     """A controlled database/lifecycle error safe to show in the CLI."""
 
+    code = "recovery_required"
+    cause = "lifecycle_error"
+
+
+class StorageUnavailable(PersistenceError):
+    code = "storage_unavailable"
+    cause = None
+
+
+class InvestigationNotFound(PersistenceError):
+    code = "investigation_not_found"
+    cause = None
+
+
+class IncompatibleRuntime(PersistenceError):
+    code = "incompatible_runtime"
+    cause = None
+
+
+class InvestigationFailed(PersistenceError):
+    code = "investigation_failed"
+
+    def __init__(self, message: str, cause: str | None = None):
+        super().__init__(message)
+        self.cause = cause
+
+
+class ExecutionFailed(PersistenceError):
+    """Known execution failure, with a stable category for application clients."""
+
+    def __init__(self, message: str, code: str):
+        super().__init__(message)
+        self.code = code
+        self.cause = code
+
 
 class InvestigationBusy(PersistenceError):
-    pass
+    code = "investigation_busy"
+    cause = None
 
 
 class RecoveryRequired(PersistenceError):
-    pass
+    cause = "uncertain_attempt"
 
 
 def investigation_id(value: str) -> str:
@@ -84,11 +120,13 @@ def open_database(url: str) -> Iterator["Database"]:
                     ],
                 )
                 yield Database(app, PostgresSaver(checkpoints, serde=serde))
+    except ConfigurationError:
+        raise  # Configuration failures from an operation are not DSN parse errors.
     except psycopg.errors.UndefinedTable:
-        raise PersistenceError("Database is not initialized; run db-init first.") from None
+        raise StorageUnavailable("Database is not initialized; run db-init first.") from None
     except (psycopg.Error, ValueError):
         # Driver diagnostics can include a DSN/password; do not propagate them.
-        raise PersistenceError("PostgreSQL operation failed; check database configuration and readiness.") from None
+        raise StorageUnavailable("PostgreSQL operation failed; check database configuration and readiness.") from None
 
 
 class Database:
@@ -104,7 +142,7 @@ class Database:
                 self.connection.execute("CREATE TABLE IF NOT EXISTS ic_schema (version integer PRIMARY KEY)")
                 versions = self.connection.execute("SELECT version FROM ic_schema ORDER BY version").fetchall()
                 if versions and versions != [{"version": SCHEMA_VERSION}]:
-                    raise PersistenceError("Database schema version is incompatible; automatic migration is disabled.")
+                    raise StorageUnavailable("Database schema version is incompatible; automatic migration is disabled.")
                 self.connection.execute("INSERT INTO ic_schema VALUES (%s) ON CONFLICT DO NOTHING", (SCHEMA_VERSION,))
                 self.connection.execute("""
                     CREATE TABLE IF NOT EXISTS ic_investigations (
@@ -135,7 +173,7 @@ class Database:
     def require_initialized(self) -> None:
         versions = self.connection.execute("SELECT version FROM ic_schema").fetchall()
         if versions != [{"version": SCHEMA_VERSION}]:
-            raise PersistenceError("Database schema version is incompatible; automatic migration is disabled.")
+            raise StorageUnavailable("Database schema version is incompatible; automatic migration is disabled.")
 
     def create(self, identifier: str, inputs: dict, runtime: dict) -> None:
         self.connection.execute(
@@ -148,7 +186,7 @@ class Database:
             "SELECT * FROM ic_investigations WHERE id=%s", (identifier,),
         ).fetchone()
         if row is None:
-            raise PersistenceError("Investigation was not found.")
+            raise InvestigationNotFound("Investigation was not found.")
         return row
 
     @contextmanager

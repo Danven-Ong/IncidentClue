@@ -17,7 +17,8 @@ from incidentclue.investigation import (
 )
 from incidentclue.llm import ConfigurationError, DEFAULT_MODEL
 from incidentclue.persistence import (
-    Database, PersistenceError, RecoveryRequired, investigation_id, json_data, operation_key,
+    Database, ExecutionFailed, IncompatibleRuntime, InvestigationFailed,
+    PersistenceError, RecoveryRequired, investigation_id, json_data, operation_key,
 )
 from incidentclue.schemas import Diagnosis, Evidence, Incident
 from incidentclue.tools import HealthSnapshot, LogSnapshot
@@ -163,16 +164,21 @@ class Lifecycle:
                 pass  # Inspect saved output after releasing ownership; never call provider.
             else:
                 if row["status"] in ("failed", "recovery_required"):
-                    raise PersistenceError("Investigation cannot resume; inspect it and start a new ID.")
+                    message = "Investigation cannot resume; inspect it and start a new ID."
+                    if row["status"] == "recovery_required":
+                        error = RecoveryRequired(message)
+                        error.cause = row["error_code"]
+                        raise error
+                    raise InvestigationFailed(message, row["error_code"])
                 if row["runtime"] != runtime_fingerprint():
-                    raise PersistenceError("Saved investigation is incompatible with this runtime; resume refused.")
+                    raise IncompatibleRuntime("Saved investigation is incompatible with this runtime; resume refused.")
                 attempts = self.db.attempts(identifier)
                 if any(item["status"] == "in_flight" for item in attempts):
                     self.db.status(identifier, "recovery_required", "uncertain_attempt")
                     raise RecoveryRequired("An interrupted attempt has an uncertain outcome; resume refused and budget retained.")
                 if any(item["status"] == "failed" for item in attempts):
                     self.db.status(identifier, "failed", "prior_attempt_failed")
-                    raise PersistenceError("An earlier attempt failed; start a new investigation.")
+                    raise InvestigationFailed("An earlier attempt failed; start a new investigation.", "prior_attempt_failed")
                 try:
                     graph = self._graph(row)
                     state = self._initialize_state(row, graph)
@@ -195,10 +201,10 @@ class Lifecycle:
                     raise
                 except APIError:
                     self.db.status(identifier, "failed", "provider_error")
-                    raise PersistenceError("Provider request failed; investigation is failed and attempts remain charged.") from None
+                    raise ExecutionFailed("Provider request failed; investigation is failed and attempts remain charged.", "provider_error") from None
                 except (DiagnosisError, InputLimitError, ValidationError):
                     self.db.status(identifier, "failed", "validation_error")
-                    raise PersistenceError("Investigation validation failed; inspect the saved progress.") from None
+                    raise ExecutionFailed("Investigation validation failed; inspect the saved progress.", "validation_error") from None
                 except PersistenceError:
                     self.db.status(identifier, "recovery_required", "lifecycle_error")
                     raise
@@ -208,7 +214,7 @@ class Lifecycle:
                     raise
                 except Exception:
                     self.db.status(identifier, "failed", "execution_error")
-                    raise PersistenceError("Investigation execution failed; inspect the saved progress.") from None
+                    raise ExecutionFailed("Investigation execution failed; inspect the saved progress.", "execution_error") from None
         return self.inspect(identifier)
 
     def _advance(self, identifier, row, client_factory, pause_after):
