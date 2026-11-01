@@ -5,7 +5,7 @@ from pathlib import Path
 import shutil
 
 import httpx2
-from openai import OpenAI
+from openai import BadRequestError, OpenAI, RateLimitError
 import pytest
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -114,3 +114,26 @@ def test_actual_sdk_option_copies_preserve_request_and_usage_capture(tmp_path, m
     assert row["model_attempts"] == len(row["requests"]) == len(row["responses"]) == 2
     assert [usage["total_tokens"] for usage in row["provider_usage"]] == [15, 15]
     assert "private-test-key" not in output.read_text(encoding="utf-8")
+
+
+@pytest.mark.parametrize("code,category", [
+    ("tool_use_failed", "tool_generation_rejected"),
+    ("json_validate_failed", "structured_output_rejected"),
+    ("context_length_exceeded", "context_limit"),
+    ("untrusted-secret-code", "unclassified"),
+    (["invalid", "code"], "unclassified"),
+])
+def test_provider_error_details_exclude_private_text(code, category):
+    response = httpx2.Response(400, request=httpx2.Request("POST", "https://invalid.example"),
+                              headers={"retry-after": "private-header"})
+    error = BadRequestError("private-message", response=response, body={"error": {
+        "code": code, "message": "private-message", "failed_generation": "private-generated-text"}})
+    assert suite.provider_error_details(error) == {"http_status": 400, "category": category}
+
+
+def test_rate_limit_metadata_records_numeric_hint_without_retry():
+    response = httpx2.Response(429, request=httpx2.Request("POST", "https://invalid.example"),
+                              headers={"retry-after": "90"})
+    error = RateLimitError("private-message", response=response, body="private-body")
+    assert suite.provider_error_details(error) == {
+        "http_status": 429, "category": "rate_limit", "retry_after_seconds": 90.0}

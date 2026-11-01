@@ -22,6 +22,9 @@ case split/count (`--split development --limit 12`). Credentials come from
 `GROQ_API_KEY` or an explicitly supplied `--env-file`; they are never output.
 Use this only for a separately agreed evaluation. No evaluations run on startup.
 The runner stops the batch on its first provider rate limit without retries.
+Known provider failures are classified by HTTP status and allowlisted error codes;
+free-text error messages and headers are excluded. Numeric `Retry-After` hints
+are recorded without automatically waiting or retrying.
 Use `--case-ids case-19 case-20` to select specific cases within the chosen split;
 this allows unattempted cases to run without implicitly replaying earlier ones.
 

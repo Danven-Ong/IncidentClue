@@ -155,6 +155,37 @@ def test_model_can_skip_lookup_and_still_get_validated_final(incident, health):
     assert all(item["role"] != "tool" for item in requests[1]["messages"])
 
 
+@pytest.mark.parametrize("model", [DEFAULT_MODEL, "openai/gpt-oss-120b", "custom-test-model"])
+def test_selection_policy_scopes_tools_and_keeps_generation_caps(incident, health, logs, model):
+    requests = []
+    original_health_tool = deepcopy(investigation.HEALTH_TOOL)
+    original_log_tool = deepcopy(investigation.LOG_TOOL)
+    with fake_client([completion({"content": "done"}), abstention()], requests) as client:
+        investigation.investigate_incident(incident, client, health, model, logs=logs)
+    selection, diagnosis = requests
+    if model.startswith("openai/gpt-oss-"):
+        assert selection["reasoning_effort"] == "low"
+    else:
+        assert "reasoning_effort" not in selection
+    assert "reasoning_effort" not in diagnosis
+    assert selection["max_completion_tokens"] == 512
+    assert diagnosis["max_completion_tokens"] == 1024
+    assert {tool["function"]["name"] for tool in selection["tools"]} == {"get_service_health", "get_logs"}
+    for tool in selection["tools"]:
+        assert tool["function"]["parameters"]["properties"]["service"]["enum"] == [incident.service]
+    assert investigation.HEALTH_TOOL == original_health_tool
+    assert investigation.LOG_TOOL == original_log_tool
+
+
+def test_health_only_prompt_and_schema_do_not_offer_logs(incident, health):
+    requests = []
+    with fake_client([completion({"content": "done"}), abstention()], requests) as client:
+        investigation.investigate_incident(incident, client, health)
+    selection = requests[0]
+    assert [tool["function"]["name"] for tool in selection["tools"]] == ["get_service_health"]
+    assert "get_logs" not in json.dumps(selection)
+
+
 @pytest.mark.parametrize("arguments", [
     "not json", "[]", "null", "{}", '{"service":1}',
     '{"service":"checkout","command":"restart"}',
@@ -223,6 +254,8 @@ def test_incomplete_selection_fails_without_final_request(incident, health, sele
     with fake_client([selection], requests) as client, pytest.raises(DiagnosisError):
         investigation.investigate_incident(incident, client, health)
     assert len(requests) == 1
+    assert requests[0]["reasoning_effort"] == "low"
+    assert requests[0]["max_completion_tokens"] == 512
 
 
 @pytest.mark.parametrize("responses", [[429], ["timeout"], ["selection", "timeout"]])

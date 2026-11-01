@@ -7,6 +7,7 @@ from pathlib import Path
 import time
 from types import SimpleNamespace
 
+from openai import APIStatusError
 from incidentclue.investigation import investigate_incident
 from incidentclue.diagnosis import DiagnosisError
 from incidentclue.lifecycle import runtime_fingerprint
@@ -136,6 +137,37 @@ def fake_client():
     return Fake()
 
 
+def provider_error_details(error):
+    """Classify known provider errors without retaining free-text messages/headers."""
+    if not isinstance(error, APIStatusError):
+        return None
+    body = error.body
+    details = body.get("error", body) if isinstance(body, dict) else {}
+    if not isinstance(details, dict):
+        details = {}
+    categories = {
+        "tool_use_failed": "tool_generation_rejected",
+        "json_validate_failed": "structured_output_rejected",
+        "context_length_exceeded": "context_limit",
+        "rate_limit_exceeded": "rate_limit",
+        "invalid_api_key": "authentication",
+    }
+    code = details.get("code")
+    category = categories.get(code, "unclassified") if isinstance(code, str) else "unclassified"
+    if error.status_code == 429:
+        category = "rate_limit"
+    result = {"http_status": error.status_code, "category": category}
+    # A numeric server hint can inform a later manual run; never sleep/retry here.
+    hint = error.response.headers.get("retry-after", "")
+    try:
+        seconds = float(hint)
+        if 0 <= seconds <= 86400:
+            result["retry_after_seconds"] = seconds
+    except (ValueError, TypeError):
+        pass
+    return result
+
+
 class RecordingClient:
     """Keep capture across SDK with_options copies without changing the SDK object."""
     def __init__(self, client, requests, responses, usage):
@@ -202,6 +234,9 @@ def baseline(*, live, model, split, limit, output, env_file=None, case_ids=None)
             except Exception as error:
                 # Keep private provider/credential detail out of captured evidence.
                 record.update({"status": "error", "error_type": type(error).__name__})
+                details = provider_error_details(error)
+                if details is not None:
+                    record["provider_error"] = details
                 if type(error) is DiagnosisError:
                     record["validation_error"] = str(error)
                 record["cause_types"] = []
@@ -209,7 +244,7 @@ def baseline(*, live, model, split, limit, output, env_file=None, case_ids=None)
                 while cause is not None and len(record["cause_types"]) < 5:
                     record["cause_types"].append(type(cause).__name__)
                     cause = cause.__cause__
-                rate_limited = type(error).__name__ == "RateLimitError"
+                rate_limited = (details is not None and details["category"] == "rate_limit") or type(error).__name__ == "RateLimitError"
             record.update({"elapsed_seconds": time.perf_counter() - started,
                            "events": events, "steps": steps, "summary": summary,
                            "model_attempts": len(requests), "provider_usage": usage,

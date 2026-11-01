@@ -21,6 +21,9 @@ Browser/API creation pauses with zero attempts charged; CLI `start` can execute
 immediately. Python limits each investigation to **three model requests and two
 tool attempts**, with no automatic provider retries.
 
+GPT-OSS tool selection uses low reasoning effort within the 512-token cap.
+Final diagnosis keeps its existing 1,024-token cap and provider reasoning default.
+
 Tools read recorded health and log snapshots. Evidence is deduplicated;
 conflicting IDs fail. The result is a hypothesis or `insufficient_evidence`, validated against
 the supplied evidence IDs. References do not prove causation, and suggested
