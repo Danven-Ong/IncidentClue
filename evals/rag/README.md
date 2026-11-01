@@ -32,3 +32,19 @@ The fixture validator checks hashes, source bounds, case partitions and canaries
 The default validator does not load the embedding tokenizer; its 200-token gate
 must be verified separately against the pinned artifact before ingestion.
 This foundation does not implement ingestion, retrieval or source citations.
+
+## Review saved results offline
+
+```bash
+python evals/rag/review.py /path/to/baseline.jsonl --output /path/outside/repository/review.json
+```
+
+Review defaults to development cases; held-out review requires `--split held_out`.
+It checks frozen input hashes and reports missed abstentions, answerable cases
+that abstained, citation membership and missing-evidence presence. Execution errors
+and unattempted cases stay unassessed. Labels are read only by the evaluator.
+
+Each report is reviewed separately; reruns do not replace earlier failures.
+Automatic checks cannot establish causal support or the usefulness of checks.
+Passing them still requires manual semantic review; fake responses establish no
+model quality. The command makes no provider calls and refuses output overwrite.

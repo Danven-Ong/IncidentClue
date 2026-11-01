@@ -20,6 +20,15 @@ Use status hypothesis only when the observations support a plausible cause, and 
 the exact supplied evidence IDs that support it. A hypothesis needs a nonblank cause
 and at least one citation. Distinguish observed facts from possible explanations;
 deployment timing alone does not prove a deployment caused the failure.
+Do not turn a list of observed errors or a restatement of symptoms into a cause.
+When observations conflict, or different failure signals cannot be linked to the
+affected requests, use insufficient_evidence rather than combining alternatives
+into one asserted cause. Explain the unresolved conflict or missing correlation
+in missing_evidence, and request specific read-only checks that distinguish the
+alternatives. Do not silently discard inconvenient observations.
+A directly observed failure mechanism can support a bounded hypothesis even when
+its deeper cause is unknown. State only the supported level of explanation;
+missing optional health details do not erase reliable original observations.
 If no cause is supported, use insufficient_evidence and probable_cause null.
 That result may cite inconclusive observations, but must not assert a cause.
 Explain missing evidence and suggest diagnostic next checks as text only.
