@@ -1,21 +1,25 @@
-# Synthetic health-tool investigation — 28 October 2026
+# Health-tool observation
 
-One live `investigate` run used `openai/gpt-oss-20b` on Groq, with the [ambiguous incident](../../data/synthetic/checkout-ambiguous.json) and a separate [synthetic health snapshot](../../data/synthetic/checkout-health.json). The model requested the allowed function, Python returned health evidence, and a second model request produced a structurally accepted diagnosis. [Actual run record](health-tool-2026-10-28.json). Human review is pending.
+**28 October 2026 · Groq · `openai/gpt-oss-20b`**
 
-The tool-enabled implementation was uncommitted over base `cef8619806defc461106ada397a8507144d25152` during execution. There was one live attempt with no repairs or automatic retries. The CLI used the explicitly configured local environment file. No credentials or raw provider errors are in the published record. Provider usage/response identifiers were unavailable and remain null.
+One live model run used the [ambiguous incident](../../data/synthetic/checkout-ambiguous.json)
+and [recorded health snapshot](../../data/synthetic/checkout-health.json).
+The [original record](health-tool-2026-10-28.json) retains the source context,
+hashes and output.
 
-## Observed flow
+## Result
 
-1. The model received original E1/E2/E3 and the health tool schema. The health snapshot was not included in that request.
-2. It requested `get_service_health` with `{"service":"checkout"}`.
-3. Python validated the tool and arguments, checked the incident service, and returned H1: a recorded readiness detail reports missing PAYMENT_API_URL. This read an in-memory synthetic snapshot; no live service was contacted or changed.
-4. The second request included the assistant tool call and matching tool result. It offered no executable tools and requested strict Diagnosis JSON.
-5. The accepted result proposed missing configuration and cited E1/E2/E3/H1. The CLI exited 0. Processing duration across the command was 2,789.73 ms, excluding record writing; this is one observation, not a performance benchmark.
+The model requested `get_service_health`. Python returned H1, reporting missing
+`PAYMENT_API_URL`. A second model request produced an accepted hypothesis citing
+E1/E2/E3/H1. Exit code: **0**. No live service was contacted or changed.
 
-## Assistant evidence review
+## Review
 
-H1 supports missing configuration as a plausible reason for checkout not being ready. E2 shows HTTP 503; E1 gives deployment context and E3 reports an unspecified timeout. Neither E1 nor E3 directly establishes the configuration cause. The response overstates the evidence by treating the configuration failure as the established cause of the request timeouts as well. The earlier ambiguous-only pilot abstained, but these are separate stochastic runs rather than a controlled causal experiment or accuracy measurement.
+- H1 supports missing configuration, but does not establish the cause of the
+  separate timeout symptom. The response overstated that connection.
+- Missing evidence was empty despite unresolved questions.
+- Restart advice violated the read-only instructions; no restart was executed.
 
-The model left missing_evidence empty, although the origin of the missing variable and the relationship to the timeout remain unknown. It also suggested ensuring the service is restarted with updated configuration, despite the final instructions requesting read-only checks. This is a prompt-adherence failure in textual advice. The tool dispatcher has no restart function and executed no remediation; valid JSON and existing citations did not detect this advice violation.
-
-This run demonstrates actual model-requested tool execution and evidence propagation. It does not establish safe advice, diagnosis accuracy, arbitrary prompt-injection resistance, production authorization, or the reliability of future live integrations. Offline tests separately cover scope restrictions, malformed/unknown requests, budgets, unavailable data, provider failures, evidence collisions, and invalid citations. Before production use, constrain or review suggested actions and evaluate more cases; do not treat one successful tool call as proof of an autonomous investigator.
+One attempt, no repairs or automatic retries. Usage/response IDs were unavailable.
+This assistant-reviewed synthetic observation does not establish accuracy or safe
+advice; independent human review is pending.
