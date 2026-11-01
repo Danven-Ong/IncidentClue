@@ -1,0 +1,20 @@
+{
+  "incident": {
+    "incident_id": "case-23",
+    "service": "identity",
+    "summary": "Clients reject secure connections.",
+    "evidence": [
+      {
+        "id": "O1",
+        "timestamp": "2026-09-15T10:00:00Z",
+        "kind": "log",
+        "content": "Handshake verification reports certificate expired; notAfter precedes the independently verified client clock."
+      }
+    ]
+  },
+  "health": {
+    "service": "identity",
+    "evidence": []
+  },
+  "logs": null
+}

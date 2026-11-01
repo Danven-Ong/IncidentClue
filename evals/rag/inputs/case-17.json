@@ -1,0 +1,20 @@
+{
+  "incident": {
+    "incident_id": "case-17",
+    "service": "inventory",
+    "summary": "Database requests miss deadlines.",
+    "evidence": [
+      {
+        "id": "O1",
+        "timestamp": "2026-09-15T10:00:00Z",
+        "kind": "log",
+        "content": "Open connections=50, checked-out=2, limit=50, acquisition wait=0ms; query execution p99=7s."
+      }
+    ]
+  },
+  "health": {
+    "service": "inventory",
+    "evidence": []
+  },
+  "logs": null
+}

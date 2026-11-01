@@ -1,0 +1,20 @@
+{
+  "incident": {
+    "incident_id": "case-12",
+    "service": "media",
+    "summary": "Uploads sometimes fail.",
+    "evidence": [
+      {
+        "id": "O1",
+        "timestamp": "2026-09-15T10:00:00Z",
+        "kind": "log",
+        "content": "Users report intermittent upload failures; no logs or health observations are available."
+      }
+    ]
+  },
+  "health": {
+    "service": "media",
+    "evidence": []
+  },
+  "logs": null
+}

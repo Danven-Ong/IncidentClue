@@ -1,0 +1,20 @@
+{
+  "incident": {
+    "incident_id": "case-18",
+    "service": "catalog",
+    "summary": "Instance remains unready.",
+    "evidence": [
+      {
+        "id": "O1",
+        "timestamp": "2026-09-15T10:00:00Z",
+        "kind": "log",
+        "content": "Cache warm-up completed 4 minutes ago. Readiness reason=database_connection_refused; database handshake attempts are refused."
+      }
+    ]
+  },
+  "health": {
+    "service": "catalog",
+    "evidence": []
+  },
+  "logs": null
+}

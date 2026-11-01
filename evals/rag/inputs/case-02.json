@@ -1,0 +1,20 @@
+{
+  "incident": {
+    "incident_id": "case-02",
+    "service": "billing",
+    "summary": "Dependency calls fail immediately.",
+    "evidence": [
+      {
+        "id": "O1",
+        "timestamp": "2026-09-15T10:00:00Z",
+        "kind": "log",
+        "content": "Resolver returned NXDOMAIN for tax.svc.internal; no connection was attempted."
+      }
+    ]
+  },
+  "health": {
+    "service": "billing",
+    "evidence": []
+  },
+  "logs": null
+}

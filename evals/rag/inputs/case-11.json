@@ -1,0 +1,20 @@
+{
+  "incident": {
+    "incident_id": "case-11",
+    "service": "archive",
+    "summary": "Writes fail.",
+    "evidence": [
+      {
+        "id": "O1",
+        "timestamp": "2026-09-15T10:00:00Z",
+        "kind": "log",
+        "content": "Filesystem reports zero free bytes; append failed with ENOSPC on the mounted data volume."
+      }
+    ]
+  },
+  "health": {
+    "service": "archive",
+    "evidence": []
+  },
+  "logs": null
+}

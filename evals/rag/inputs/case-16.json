@@ -1,0 +1,20 @@
+{
+  "incident": {
+    "incident_id": "case-16",
+    "service": "returns",
+    "summary": "Requests fail after a release.",
+    "evidence": [
+      {
+        "id": "O1",
+        "timestamp": "2026-09-15T10:00:00Z",
+        "kind": "log",
+        "content": "Application SQL requires column refund_state; database catalog shows it absent; queries fail with undefined_column."
+      }
+    ]
+  },
+  "health": {
+    "service": "returns",
+    "evidence": []
+  },
+  "logs": null
+}

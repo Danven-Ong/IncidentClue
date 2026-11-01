@@ -1,0 +1,20 @@
+{
+  "incident": {
+    "incident_id": "case-15",
+    "service": "recommendations",
+    "summary": "Dependency requests fail.",
+    "evidence": [
+      {
+        "id": "O1",
+        "timestamp": "2026-09-15T10:00:00Z",
+        "kind": "log",
+        "content": "DNS resolution succeeded; TCP connection to the configured port was refused. Listener health reports stopped."
+      }
+    ]
+  },
+  "health": {
+    "service": "recommendations",
+    "evidence": []
+  },
+  "logs": null
+}

@@ -1,0 +1,125 @@
+{
+  "schema_version": 1,
+  "cases": [
+    {
+      "id": "case-01",
+      "split": "development",
+      "path": "inputs/case-01.json"
+    },
+    {
+      "id": "case-02",
+      "split": "development",
+      "path": "inputs/case-02.json"
+    },
+    {
+      "id": "case-03",
+      "split": "development",
+      "path": "inputs/case-03.json"
+    },
+    {
+      "id": "case-04",
+      "split": "development",
+      "path": "inputs/case-04.json"
+    },
+    {
+      "id": "case-05",
+      "split": "development",
+      "path": "inputs/case-05.json"
+    },
+    {
+      "id": "case-06",
+      "split": "development",
+      "path": "inputs/case-06.json"
+    },
+    {
+      "id": "case-07",
+      "split": "development",
+      "path": "inputs/case-07.json"
+    },
+    {
+      "id": "case-08",
+      "split": "development",
+      "path": "inputs/case-08.json"
+    },
+    {
+      "id": "case-09",
+      "split": "development",
+      "path": "inputs/case-09.json"
+    },
+    {
+      "id": "case-10",
+      "split": "development",
+      "path": "inputs/case-10.json"
+    },
+    {
+      "id": "case-11",
+      "split": "development",
+      "path": "inputs/case-11.json"
+    },
+    {
+      "id": "case-12",
+      "split": "development",
+      "path": "inputs/case-12.json"
+    },
+    {
+      "id": "case-13",
+      "split": "held_out",
+      "path": "inputs/case-13.json"
+    },
+    {
+      "id": "case-14",
+      "split": "held_out",
+      "path": "inputs/case-14.json"
+    },
+    {
+      "id": "case-15",
+      "split": "held_out",
+      "path": "inputs/case-15.json"
+    },
+    {
+      "id": "case-16",
+      "split": "held_out",
+      "path": "inputs/case-16.json"
+    },
+    {
+      "id": "case-17",
+      "split": "held_out",
+      "path": "inputs/case-17.json"
+    },
+    {
+      "id": "case-18",
+      "split": "held_out",
+      "path": "inputs/case-18.json"
+    },
+    {
+      "id": "case-19",
+      "split": "held_out",
+      "path": "inputs/case-19.json"
+    },
+    {
+      "id": "case-20",
+      "split": "held_out",
+      "path": "inputs/case-20.json"
+    },
+    {
+      "id": "case-21",
+      "split": "held_out",
+      "path": "inputs/case-21.json"
+    },
+    {
+      "id": "case-22",
+      "split": "held_out",
+      "path": "inputs/case-22.json"
+    },
+    {
+      "id": "case-23",
+      "split": "held_out",
+      "path": "inputs/case-23.json"
+    },
+    {
+      "id": "case-24",
+      "split": "held_out",
+      "path": "inputs/case-24.json"
+    }
+  ]
+}

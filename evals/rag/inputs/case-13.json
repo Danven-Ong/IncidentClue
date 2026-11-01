@@ -1,0 +1,20 @@
+{
+  "incident": {
+    "incident_id": "case-13",
+    "service": "pricing",
+    "summary": "Worker refuses startup.",
+    "evidence": [
+      {
+        "id": "O1",
+        "timestamp": "2026-09-15T10:00:00Z",
+        "kind": "log",
+        "content": "Validation rejected required RATE_TABLE_URL because its effective value is blank; no listener opened."
+      }
+    ]
+  },
+  "health": {
+    "service": "pricing",
+    "evidence": []
+  },
+  "logs": null
+}

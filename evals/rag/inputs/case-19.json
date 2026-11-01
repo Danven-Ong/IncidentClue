@@ -1,0 +1,20 @@
+{
+  "incident": {
+    "incident_id": "case-19",
+    "service": "pricing",
+    "summary": "Some workers reject initialization.",
+    "evidence": [
+      {
+        "id": "O1",
+        "timestamp": "2026-09-15T10:00:00Z",
+        "kind": "log",
+        "content": "A startup event reports required setting absent; an uncorrelated configuration snapshot reports it populated. Instance and revision mapping are missing."
+      }
+    ]
+  },
+  "health": {
+    "service": "pricing",
+    "evidence": []
+  },
+  "logs": null
+}

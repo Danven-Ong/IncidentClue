@@ -1,0 +1,20 @@
+{
+  "incident": {
+    "incident_id": "case-24",
+    "service": "reporting",
+    "summary": "Generated reports appear incorrect.",
+    "evidence": [
+      {
+        "id": "O1",
+        "timestamp": "2026-09-15T10:00:00Z",
+        "kind": "log",
+        "content": "A user reports incorrect totals but supplies no example, query, output or error observation."
+      }
+    ]
+  },
+  "health": {
+    "service": "reporting",
+    "evidence": []
+  },
+  "logs": null
+}

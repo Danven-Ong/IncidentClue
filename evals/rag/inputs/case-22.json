@@ -1,0 +1,20 @@
+{
+  "incident": {
+    "incident_id": "case-22",
+    "service": "returns",
+    "summary": "Requests occasionally time out.",
+    "evidence": [
+      {
+        "id": "O1",
+        "timestamp": "2026-09-15T10:00:00Z",
+        "kind": "log",
+        "content": "An HTTP deadline-exceeded count increased. Connection, acquisition and processing timings are unavailable."
+      }
+    ]
+  },
+  "health": {
+    "service": "returns",
+    "evidence": []
+  },
+  "logs": null
+}

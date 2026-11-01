@@ -1,0 +1,4 @@
+# Corpus byte hashes and fixture reports must agree across Windows and Linux.
+data/runbooks/*.md text eol=lf
+data/runbooks/*.json text eol=lf
+evals/rag/** text eol=lf
