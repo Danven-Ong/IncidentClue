@@ -1,5 +1,9 @@
 # IncidentClue
 
+The [local browser client](frontend/README.md) supports incident entry and
+UUID-based investigation inspection, resume and cooperative pause through
+FastAPI. The CLI remains a supported client of the same saved lifecycle.
+
 The local FastAPI service exposes the same durable lifecycle as the retained CLI.
 See [HTTP API setup and contract](docs/http-api.md) for create, inspect, resume,
 cooperative pause, error semantics and local Compose usage.

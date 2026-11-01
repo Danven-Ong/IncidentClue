@@ -3,7 +3,7 @@ name: incidentclue
 services:
   postgres:
     image: postgres:17-bookworm@sha256:839fbb5a4942a7758dd93e18b42ea5649807491a0545b5eeeb8f0b8bb11857a5
-    profiles: [durable, web]
+    profiles: [durable, web, frontend]
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-incidentclue}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-local-development-only}
@@ -48,7 +48,7 @@ services:
 
   web:
     image: incidentclue:local
-    profiles: [web]
+    profiles: [web, frontend]
     build:
       context: .
       dockerfile: backend/Dockerfile
@@ -84,6 +84,25 @@ services:
       timeout: 6s
       retries: 20
       start_period: 5s
+
+  frontend:
+    image: incidentclue-frontend:local
+    profiles: [frontend]
+    build:
+      context: ./frontend
+    read_only: true
+    depends_on:
+      web:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:${INCIDENTCLUE_FRONTEND_PORT:-8080}:8080"
+    tmpfs:
+      - /tmp:size=16m,mode=1777
+    healthcheck:
+      test: [CMD, wget, --quiet, --spider, "http://127.0.0.1:8080/"]
+      interval: 3s
+      timeout: 5s
+      retries: 20
 
   incidentclue:
     image: incidentclue:local

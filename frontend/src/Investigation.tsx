@@ -3,7 +3,7 @@ import { boundaries, isObject, strings, type Boundary, type JsonObject } from '.
 import { useInvestigation } from './useInvestigation';
 
 function text(v: unknown) { return typeof v === 'string' ? v : 'Unavailable'; }
-function time(value: string) { return Number.isFinite(Date.parse(value)) ? new Date(value).toLocaleString() : value; }
+function time(value: string) { return Number.isFinite(Date.parse(value)) ? new Date(value).toLocaleString(undefined, { timeZoneName: 'short' }) : value; }
 function JsonDetails({ value, label }: { value: unknown; label: string }) {
   return <details><summary>{label}</summary><pre>{JSON.stringify(value, null, 2)}</pre></details>;
 }
@@ -23,7 +23,8 @@ function Diagnosis({ state }: { state: JsonObject }) {
   if (!isObject(d)) return <p className="muted">No validated diagnosis saved.</p>;
   const known = ['hypothesis', 'insufficient_evidence'].includes(String(d.status))
     && strings(d.evidence_ids) && strings(d.missing_evidence) && strings(d.next_checks)
-    && (d.probable_cause === null || typeof d.probable_cause === 'string');
+    && (d.status === 'hypothesis' ? typeof d.probable_cause === 'string' && !!d.probable_cause.trim()
+      && Array.isArray(d.evidence_ids) && d.evidence_ids.length > 0 : d.probable_cause === null);
   if (!known) return <><p className="muted">Saved diagnosis format is not recognised.</p><JsonDetails label="Diagnosis details" value={d} /></>;
   const references = d.evidence_ids as string[];
   const evidence = Array.isArray(state.evidence) ? state.evidence.filter(isObject) : [];
