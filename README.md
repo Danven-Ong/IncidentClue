@@ -1,29 +1,39 @@
 # IncidentClue
 
+The [local browser client](frontend/README.md) supports incident entry and
+UUID-based investigation inspection, resume and cooperative pause through
+FastAPI. The CLI remains a supported client of the same saved lifecycle.
+
+With Docker Desktop running, start the site with
+`docker compose --profile frontend up --build -d --wait frontend`, then open
+`http://localhost:8080`. Database setup runs automatically in a separate container;
+no manual CLI command or `.env` file is required to open the site. New model
+execution requires a server-side provider key. See [frontend setup](frontend/README.md).
+
 The local FastAPI service exposes the same durable lifecycle as the retained CLI.
 See [HTTP API setup and contract](docs/http-api.md) for create, inspect, resume,
 cooperative pause, error semantics and local Compose usage.
 
 Investigate Software Outages with AI.
 
-IncidentClue is designed to analyze logs, service health, and deployment events, then produce a structured diagnosis with supporting evidence and suggested diagnostic checks. The application is organized into a Python backend and a future web frontend.
+IncidentClue analyzes recorded logs, service health, and deployment evidence to produce a structured hypothesis with supporting references and suggested diagnostic checks. The application has a Python backend and a local web frontend.
 
 ## Status
 
-Early development. The CLI diagnoses supplied evidence or gathers synthetic health/log observations through a bounded LangGraph investigation. One-shot commands support local JSON run records. Durable commands use PostgreSQL checkpoints to start, inspect, pause and resume the same investigation across process restarts. Business rules, citation membership and request budgets are enforced in Python. Broader diagnosis evaluation, the HTTP API and web frontend remain pending.
+Early development. The browser and FastAPI expose a bounded LangGraph investigation with PostgreSQL checkpoint/pause/resume. The optional CLI also supports one-shot commands and local JSON run records. Business rules, citation membership and request budgets are enforced in Python. Broader diagnosis evaluation and retrieval remain pending.
 
 ## Requirements
 
-- Python 3.12 or newer
-- pip
-- Docker Desktop/Engine with Compose for the optional PostgreSQL lifecycle
+- Docker Desktop/Engine with Compose for the one-command website
+- A Groq API key only for new model execution
+- Python 3.12 or newer and pip only for native backend/CLI development
 
 The initial environment was verified on Windows with Python 3.13.
 
 For PostgreSQL setup, durable commands, recovery guarantees and the pause/resume
 demo, see [durable investigation lifecycle](docs/checkpoint-resume.md).
 
-## Installation
+## Optional native backend / CLI installation
 
 From the repository root, create an isolated environment:
 

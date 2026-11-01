@@ -17,6 +17,8 @@ node_modules/
 .output/
 .vite/
 *.tsbuildinfo
+playwright-report/
+test-results/
 coverage/
 
 # Secrets and local runtime output

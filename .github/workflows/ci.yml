@@ -163,6 +163,47 @@ jobs:
           python backend/tests/compose_api_smoke.py http://127.0.0.1:8000 /tmp/http-created.json inspect
           docker compose --profile web down
 
+      - name: Verify built frontend and same-origin API across restarts
+        run: |
+          docker compose build frontend
+          docker compose --profile frontend up -d --wait frontend
+          python backend/tests/compose_api_smoke.py http://127.0.0.1:8080/api /tmp/frontend-created.json create
+          docker compose restart postgres web frontend
+          docker compose --profile frontend up -d --wait frontend
+          python backend/tests/compose_api_smoke.py http://127.0.0.1:8080/api /tmp/frontend-created.json inspect
+          python -c '
+          import json, urllib.request, urllib.error
+          response = urllib.request.urlopen("http://127.0.0.1:8080/")
+          html = response.read()
+          assert b"IncidentClue" in html
+          assert "script-src" in response.headers["Content-Security-Policy"]
+          import re
+          asset = re.search(rb"src=\x22([^\x22]+\.js)\x22", html).group(1).decode()
+          for path in (asset, "/api/health"):
+              headers = urllib.request.urlopen("http://127.0.0.1:8080" + path).headers
+              assert headers["X-Content-Type-Options"] == "nosniff"
+              assert "script-src" in headers["Content-Security-Policy"]
+          request = urllib.request.Request("http://127.0.0.1:8080/api/investigations", data=b"x" * 100001, method="POST")
+          try:
+              urllib.request.urlopen(request)
+              raise AssertionError("Oversize request accepted")
+          except urllib.error.HTTPError as error:
+              assert error.code == 413
+              assert json.load(error)["error"]["code"] == "request_too_large"
+          '
+          docker compose --profile frontend down
+
+      - name: Verify fresh one-command startup without CLI or an environment-file mount
+        run: |
+          docker compose -p incidentclue-startup-ci --env-file .env.example --profile frontend up --build -d --wait frontend
+          python backend/tests/compose_api_smoke.py http://127.0.0.1:8080/api /tmp/one-command-created.json create
+          docker compose -p incidentclue-startup-ci --env-file .env.example --profile frontend up -d --wait frontend
+          python backend/tests/compose_api_smoke.py http://127.0.0.1:8080/api /tmp/one-command-created.json inspect
+          docker compose -p incidentclue-startup-ci --env-file .env.example --profile frontend restart postgres web frontend
+          docker compose -p incidentclue-startup-ci --env-file .env.example --profile frontend up -d --wait frontend
+          python backend/tests/compose_api_smoke.py http://127.0.0.1:8080/api /tmp/one-command-created.json inspect
+          docker compose -p incidentclue-startup-ci --env-file .env.example --profile frontend down
+
   postgres:
     name: PostgreSQL recovery (Python ${{ matrix.python }})
     runs-on: ubuntu-latest
@@ -205,9 +246,61 @@ jobs:
       - name: Verify PostgreSQL checkpoints, crashes, budgets and concurrency offline
         run: python -m pytest backend/tests -m postgres -q
 
+  frontend:
+    name: Frontend and browser (Node 24, Chromium)
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    services:
+      postgres:
+        image: postgres:17-bookworm@sha256:839fbb5a4942a7758dd93e18b42ea5649807491a0545b5eeeb8f0b8bb11857a5
+        env:
+          POSTGRES_USER: incidentclue
+          POSTGRES_PASSWORD: ci-only-password
+          POSTGRES_DB: incidentclue_frontend_test
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U incidentclue -d incidentclue_frontend_test"
+          --health-interval 2s --health-timeout 3s --health-retries 30
+    env:
+      GROQ_API_KEY: ""
+      OPENAI_API_KEY: ""
+      INCIDENTCLUE_BROWSER_DATABASE_URL: postgresql://incidentclue:ci-only-password@localhost:5432/incidentclue_frontend_test
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: "24.16.0"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: "3.13"
+      - name: Install backend fixture dependencies and built package
+        working-directory: .
+        run: |
+          python -m pip install -r backend/requirements-dev.lock.txt
+          python -m build --no-isolation backend
+          python -m pip install --no-deps backend/dist/*.whl
+      - name: Install pinned frontend dependencies
+        run: npm ci --ignore-scripts
+      - name: Type check, build, lint and test
+        run: |
+          npm run build
+          npm run lint
+          npm test
+      - name: Install test browser
+        run: npx playwright install --with-deps chromium
+      - name: Browser and real API integration with fake provider
+        run: npm run test:browser
+
   gate:
     name: CI gate
-    needs: [backend, container, postgres]
+    needs: [backend, container, postgres, frontend]
     if: ${{ always() }}
     runs-on: ubuntu-latest
     timeout-minutes: 2
@@ -215,6 +308,7 @@ jobs:
       BACKEND_RESULT: ${{ needs.backend.result }}
       CONTAINER_RESULT: ${{ needs.container.result }}
       POSTGRES_RESULT: ${{ needs.postgres.result }}
+      FRONTEND_RESULT: ${{ needs.frontend.result }}
     steps:
       - name: Require backend, container and PostgreSQL checks to succeed
-        run: test "$BACKEND_RESULT" = success && test "$CONTAINER_RESULT" = success && test "$POSTGRES_RESULT" = success
+        run: test "$BACKEND_RESULT" = success && test "$CONTAINER_RESULT" = success && test "$POSTGRES_RESULT" = success && test "$FRONTEND_RESULT" = success

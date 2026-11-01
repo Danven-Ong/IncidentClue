@@ -3,7 +3,7 @@ name: incidentclue
 services:
   postgres:
     image: postgres:17-bookworm@sha256:839fbb5a4942a7758dd93e18b42ea5649807491a0545b5eeeb8f0b8bb11857a5
-    profiles: [durable, web]
+    profiles: [durable, web, frontend]
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-incidentclue}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-local-development-only}
@@ -46,9 +46,9 @@ services:
           create_host_path: false
     command: ["--help"]
 
-  web:
+  storage-setup:
     image: incidentclue:local
-    profiles: [web]
+    profiles: [web, frontend]
     build:
       context: .
       dockerfile: backend/Dockerfile
@@ -58,15 +58,27 @@ services:
         condition: service_healthy
     environment:
       INCIDENTCLUE_DATABASE_URL: ${INCIDENTCLUE_COMPOSE_DATABASE_URL:-postgresql://incidentclue:local-development-only@postgres:5432/incidentclue}
+    entrypoint: [python, -m, incidentclue.api.storage_setup]
+    command: []
+
+  web:
+    image: incidentclue:local
+    profiles: [web, frontend]
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    read_only: true
+    depends_on:
+      postgres:
+        condition: service_healthy
+      storage-setup:
+        condition: service_completed_successfully
+    environment:
+      INCIDENTCLUE_DATABASE_URL: ${INCIDENTCLUE_COMPOSE_DATABASE_URL:-postgresql://incidentclue:local-development-only@postgres:5432/incidentclue}
+      GROQ_API_KEY: ${GROQ_API_KEY:-}
+      GROQ_MODEL: ${GROQ_MODEL:-openai/gpt-oss-20b}
     ports:
       - "127.0.0.1:${INCIDENTCLUE_WEB_PORT:-8000}:8000"
-    volumes:
-      - type: bind
-        source: ./.env
-        target: /config/provider.env
-        read_only: true
-        bind:
-          create_host_path: false
     entrypoint: [python, -m, uvicorn]
     command:
       - incidentclue.api.app:create_app
@@ -75,8 +87,6 @@ services:
       - 0.0.0.0
       - --port
       - "8000"
-      - --env-file
-      - /config/provider.env
       - --no-access-log
     healthcheck:
       test: [CMD, python, -c, "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=5).close()"]
@@ -84,6 +94,25 @@ services:
       timeout: 6s
       retries: 20
       start_period: 5s
+
+  frontend:
+    image: incidentclue-frontend:local
+    profiles: [frontend]
+    build:
+      context: ./frontend
+    read_only: true
+    depends_on:
+      web:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:${INCIDENTCLUE_FRONTEND_PORT:-8080}:8080"
+    tmpfs:
+      - /tmp:size=16m,mode=1777
+    healthcheck:
+      test: [CMD, wget, --quiet, --spider, "http://127.0.0.1:8080/"]
+      interval: 3s
+      timeout: 5s
+      retries: 20
 
   incidentclue:
     image: incidentclue:local

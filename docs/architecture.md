@@ -4,7 +4,7 @@ IncidentClue is designed as a web application with a modular Python backend. It 
 
 ## Current implementation
 
-The backend implements input/output models, a citation-membership guard, Groq connectivity, single-request diagnosis, a bounded LangGraph health/log investigation, and durable PostgreSQL checkpoint/pause/resume. The CLI exposes one-shot flows with local run records and durable flows with database lifecycle records. Offline tests exercise the installed SDK through fake HTTP transports and recovery against real PostgreSQL. Historical live diagnosis/graph paths and semantic limitations are recorded. The HTTP API, frontend and broader evaluation remain pending.
+The backend implements input/output models, a citation-membership guard, Groq connectivity, single-request diagnosis, a bounded LangGraph health/log investigation, durable PostgreSQL checkpoint/pause/resume and a FastAPI transport adapter. The CLI exposes one-shot flows with local run records and durable flows with database lifecycle records. A local React/TypeScript frontend creates and inspects investigations by UUID, with explicit resume and cooperative pause through that API. Offline tests use fake provider transports and real PostgreSQL. Broader retrieval and evaluation remain pending. See the [HTTP contract](http-api.md) and [browser client contract](frontend.md).
 
 ## Incident input contract
 
@@ -73,7 +73,7 @@ State keeps the original input, merged evidence, bounded tool history/conversati
 | backend/src/incidentclue/ | Python package; data models and investigation logic |
 | backend/tests/ | Backend tests and shared test fixtures |
 | backend/pyproject.toml | Python packaging, dependencies, and test configuration |
-| frontend/ | Web client with its own future dependencies and build configuration |
+| frontend/ | Independently built React/TypeScript client and local static/reverse proxy |
 | data/synthetic/ | Synthetic incident snapshots for local development and demonstrations |
 | docs/ | Application architecture and technical documentation |
 

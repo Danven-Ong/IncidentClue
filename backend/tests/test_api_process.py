@@ -108,7 +108,12 @@ def test_lost_resume_response_does_not_cancel_and_inspection_remains_available(d
         try:
             with pytest.raises(httpx.ReadTimeout):
                 client.post(url + "/resume", timeout=0.3)
-            assert entered.exists()
+            # A client timeout need not wait for database ownership and provider
+            # construction. Synchronize on entry rather than machine speed.
+            deadline = time.monotonic() + 10
+            while not entered.exists():
+                assert time.monotonic() < deadline, "Provider did not start after the lost response"
+                time.sleep(0.05)
             assert client.get(url).json()["executing"]
             assert client.post(url + "/resume").status_code == 409
         finally:
