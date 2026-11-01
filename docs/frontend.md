@@ -12,6 +12,10 @@ saved drafts, automatic execution/retry, background jobs, streaming, retrieval,
 authentication or public deployment. PostgreSQL, provider credentials, budgets,
 locking and recovery belong to the backend. No schema/graph changes are required.
 
+Unsubmitted form input stays in memory when opening a UUID and returning to
+incident entry. Successful creation clears it. Reloading or closing the page
+discards it; no incident content is written to browser storage.
+
 React/TypeScript and plain CSS live in `frontend/`. Native controls, a dark
 charcoal theme, system typography and a minimal open-lens logo serve the local
 investigation workflow. Evidence and model output are rendered as text. A saved

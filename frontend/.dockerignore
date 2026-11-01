@@ -6,6 +6,7 @@
 !vite.config.ts
 !index.html
 !nginx.conf
+!security-headers.conf
 !src/
 !src/**
 !public/

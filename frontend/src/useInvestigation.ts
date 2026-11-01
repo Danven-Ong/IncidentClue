@@ -2,9 +2,9 @@ import { useEffect, useRef, useState } from 'react';
 import { api, ApiError, errorText, type Boundary, type Inspection } from './api';
 
 type View = { data: Inspection | null; loading: boolean; stale: boolean; error: string;
-  notice: string; requiresInspect: boolean; resumePending: boolean; pausePending: boolean; observed: string };
+  notice: string; requiresInspect: boolean; resumePending: boolean; pausePending: boolean; observed: string; announcement: string };
 const initial: View = { data: null, loading: true, stale: true, error: '', notice: '',
-  requiresInspect: false, resumePending: false, pausePending: false, observed: '' };
+  requiresInspect: false, resumePending: false, pausePending: false, observed: '', announcement: '' };
 type Actions = { refresh: () => void; mutate: (action: 'resume' | 'pause', boundary: Boundary) => void };
 
 export function useInvestigation(id: string) {
@@ -28,13 +28,13 @@ export function useInvestigation(id: string) {
       const current = ++sequence;
       if (!visible()) { update({ stale: true, loading: false }); return; }
       const controller = new AbortController(); read = controller;
-      update({ loading: true });
+      update({ loading: true, ...(manual ? { announcement: '' } : {}) });
       try {
         const value = await api.inspect(id, controller.signal);
         if (!live || current !== sequence) return;
         last = value; readFailed = false;
         update({ data: value, stale: false, error: '', observed: new Date().toISOString(),
-          ...(manual ? { requiresInspect: false, notice: '' } : {}) });
+          ...(manual ? { requiresInspect: false, notice: '', announcement: 'Inspection complete: ' + value.status.replaceAll('_', ' ') + '.' } : {}) });
       } catch (error) {
         if (!live || current !== sequence || controller.signal.aborted) return;
         readFailed = true; update({ stale: true, error: errorText(error) });

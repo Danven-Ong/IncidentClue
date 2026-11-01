@@ -24,7 +24,8 @@ export function App() {
         {error && <p className="error-text" id="open-error" role="alert">{error}</p>}
       </form>
       {location.error && <div className="notice error" role="alert">{location.error}</div>}
-      {location.id ? <Investigation key={location.id} id={location.id} /> : <NewIncident />}
+      <div hidden={!!location.id}><NewIncident active={!location.id} /></div>
+      {location.id && <Investigation key={location.id} id={location.id} />}
     </main>
   </>;
 }

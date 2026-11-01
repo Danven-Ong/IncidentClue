@@ -61,36 +61,40 @@ export function Investigation({ id }: { id: string }) {
     try { await navigator.clipboard.writeText(id); setCopied('UUID copied.'); }
     catch { setCopied('Could not copy. Select the UUID below.'); }
   }
+  const diagnosis = data && <section className="content-section"><h2>Diagnosis</h2><Diagnosis state={data.state} /></section>;
   return <div className="investigation">
     <div className="section-heading"><h1>{incident ? text(incident.summary) : data?.incident_id || 'Investigation'}</h1>
-      {data && <span className="status">{data.status.replaceAll('_', ' ')}</span>}</div>
+      {data && <span className="status" role="status">{data.status.replaceAll('_', ' ')}</span>}</div>
     <div className="identity"><code>{id}</code><button className="quiet" onClick={copy}>Copy UUID</button><span role="status">{copied}</span></div>
     {incident && <p className="muted incident-context">{text(incident.service)} · {data?.incident_id}</p>}
     <div className="observe"><span>{view.loading ? 'Inspecting…' : view.observed ? `Observed ${time(view.observed)}` : 'No observation received'}
       {view.stale && data ? ' · stale data' : ''}</span><button onClick={view.refresh} disabled={view.loading}>Inspect state</button></div>
+    <span className="sr-only" role="status">{view.announcement}</span>
     {view.error && <div role="alert" className="notice error">{view.error}</div>}
     {view.notice && <div role="status" className="notice">{view.notice}</div>}
     {!data && !view.loading && <p className="muted">No investigation data available. Check the UUID and API, then inspect again.</p>}
     {data && <>
+      {data.status === 'completed' && diagnosis}
       <div className="metadata"><span>Model attempts <strong>{data.charged.model} / {data.limits.model}</strong></span>
         <span>Tool attempts <strong>{data.charged.tool} / {data.limits.tool}</strong></span>
         <span>Saved model <code>{data.model}</code></span></div>
-      <section className="controls"><h2>Execution</h2>
+      {data.status === 'completed' && <p className="hint">{data.executing ? 'Executor active' : 'No executor observed'} · {data.compatible ? 'Compatible runtime' : 'Incompatible runtime'}{data.pause_requested ? ' · pause requested' : ''}</p>}
+      {data.status !== 'completed' && <section className="controls"><h2>Execution</h2>
         <div className="execution-flags"><span>{data.executing ? 'Executor active' : 'No executor observed'}</span>
           <span>{data.compatible ? 'Compatible runtime' : 'Incompatible runtime'}</span>
           {data.pause_requested && <span>Pause requested</span>}{data.recovery_needed && <span>Recovery check required</span>}
           {data.error_code && <code>{data.error_code}</code>}</div>
         <div className="actions"><label className="inline-field">Pause after<select value={boundary} disabled={view.resumePending} onChange={e => setBoundary(e.target.value as Boundary)}>
-          <option value="">No boundary</option>{boundaries.map(b => <option key={b}>{b}</option>)}</select></label>
-          <button className="primary" disabled={!canResume} onClick={() => view.mutate('resume', boundary)}>{view.resumePending ? 'Resuming…' : data.status === 'completed' ? 'Read saved result' : 'Resume'}</button>
+          <option value="">No boundary</option>{boundaries.map(b => <option key={b} value={b}>After {b}</option>)}</select></label>
+          <button className="primary" disabled={!canResume} onClick={() => view.mutate('resume', boundary)}>{view.resumePending ? 'Resuming…' : 'Resume'}</button>
           <button disabled={!canPause} onClick={() => view.mutate('pause', '')}>{view.pausePending ? 'Requesting pause…' : 'Request pause'}</button></div>
-        <p className="hint">{data.status === 'completed' ? 'Execution complete. A diagnosis remains a hypothesis.'
-          : data.status === 'paused' && data.charged.model === 0 && data.charged.tool === 0 ? 'Created paused. No attempts charged. Resume starts execution.'
+        <p className="hint">{data.status === 'paused' && data.charged.model === 0 && data.charged.tool === 0 ? 'Created paused. No attempts charged. Resume starts execution.'
           : 'Pause takes effect at a saved boundary. Closing this page does not cancel execution.'}</p>
         {data.status === 'failed' || data.status === 'recovery_required' ? <p className="warning-text">Resume refused for this saved state. Inspect details; start a new investigation if needed.</p> : null}
         {data.next_nodes.length > 0 && <p className="hint">Next nodes: <code>{data.next_nodes.join(', ')}</code></p>}
-      </section>
-      <section className="content-section"><h2>Diagnosis</h2><Diagnosis state={data.state} /></section>
+        <details><summary>Pause boundaries</summary><p className="hint">Decide selects the next lookup; execute reads recorded evidence; diagnose generates a hypothesis; validate checks the result. Completion takes precedence at the final boundary.</p></details>
+      </section>}
+      {data.status !== 'completed' && diagnosis}
       <section className="content-section"><h2>Evidence</h2><Evidence value={data.state.evidence} /></section>
       <section className="content-section"><h2>Saved activity</h2>
         {Array.isArray(data.state.tool_history) && data.state.tool_history.length > 0

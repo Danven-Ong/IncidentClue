@@ -10,41 +10,55 @@ const sample = {
   }] }, null, 2), logs: '', model: '',
 };
 
-export function NewIncident() {
+export function NewIncident({ active }: { active: boolean }) {
   const [form, setForm] = useState(defaults);
   const [error, setError] = useState('');
   const [unknown, setUnknown] = useState(false);
   const [pending, setPending] = useState(false);
   const [confirmSample, setConfirmSample] = useState(false);
+  const [syntaxField, setSyntaxField] = useState<keyof typeof defaults | null>(null);
   const busy = useRef(false);
   const controller = useRef<AbortController | null>(null);
   useEffect(() => {
     controller.current = new AbortController();
     return () => controller.current?.abort();
-  }, []);
+  }, [active]);
   const fields = (key: keyof typeof defaults) => ({
+    id: 'input-' + key,
+    'aria-invalid': syntaxField === key || undefined,
+    'aria-describedby': [key === 'health' ? 'health-help' : '', syntaxField === key ? 'form-error' : ''].filter(Boolean).join(' ') || undefined,
     value: form[key], onChange: (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
       setForm(current => ({ ...current, [key]: e.target.value })),
   });
   async function submit(e: React.SubmitEvent<HTMLFormElement>) {
     e.preventDefault();
     if (busy.current) return;
-    setError('');
+    setError(''); setSyntaxField(null);
     let body: string;
+    let parsing: keyof typeof defaults | null = null;
     try {
-      const parse = (value: string, label: string) => {
+      const parse = (value: string, label: string, key: keyof typeof defaults) => {
+        parsing = key;
         try { return JSON.parse(value); } catch { throw new Error(`${label}: invalid JSON.`); }
       };
       body = serializeRequest({ incident: { incident_id: form.incidentId, service: form.service,
-        summary: form.summary, evidence: parse(form.evidence, 'Incident evidence') },
-      health: parse(form.health, 'Health snapshot'), logs: form.logs.trim() ? parse(form.logs, 'Logs') : null,
+        summary: form.summary, evidence: parse(form.evidence, 'Incident evidence', 'evidence') },
+      health: parse(form.health, 'Health snapshot', 'health'), logs: form.logs.trim() ? parse(form.logs, 'Logs', 'logs') : null,
       model: form.model.trim() ? form.model : null });
-    } catch (error) { setError(error instanceof Error ? error.message : 'Check the input.'); return; }
+    } catch (error) {
+      const field = error instanceof ApiError ? null : parsing;
+      setSyntaxField(field); setError(error instanceof Error ? error.message : 'Check the input.');
+      if (field) document.getElementById('input-' + field)?.focus();
+      return;
+    }
     busy.current = true; setPending(true);
     const signal = controller.current?.signal;
-    try { const value = await api.create(body, signal); if (!signal?.aborted) openInvestigation(value.investigation_id); }
+    try {
+      const value = await api.create(body, signal);
+      if (!signal?.aborted) { setForm(defaults); setUnknown(false); openInvestigation(value.investigation_id); }
+    }
     catch (error) {
-      if (signal?.aborted) return;
+      if (signal?.aborted) { setUnknown(true); return; }
       const uncertain = !(error instanceof ApiError) || error.status === 0 || error.code === 'invalid_response' || error.status >= 500;
       setUnknown(uncertain); setError(errorText(error));
     } finally { busy.current = false; setPending(false); }
@@ -65,14 +79,14 @@ export function NewIncident() {
         <label>Summary<textarea required rows={3} {...fields('summary')} /></label>
         <label>Incident evidence · JSON<textarea className="code" required rows={3} spellCheck={false} {...fields('evidence')} /></label>
         <label>Health snapshot · JSON<textarea className="code" required rows={6} spellCheck={false}
-          placeholder={'{"service":"checkout","evidence":[]}'} aria-describedby="health-help" {...fields('health')} /></label>
+          placeholder={'{"service":"checkout","evidence":[]}'} {...fields('health')} /></label>
         <p id="health-help" className="hint">Recorded data. Empty evidence means no observations.</p>
         <details><summary>Optional logs and model</summary>
           <label>Logs · JSON<textarea className="code" rows={4} spellCheck={false} placeholder="null" {...fields('logs')} /></label>
           <label>Model<input maxLength={200} placeholder="Server default" {...fields('model')} /></label>
         </details>
       </fieldset>
-      {error && <div className="notice error" role="alert">{error}</div>}
+      {error && <div className="notice error" id="form-error" role="alert">{error}</div>}
       {unknown && <div className="notice warning" role="alert">Creation outcome unknown. An investigation may have been saved without a received UUID. Submitting again can create a duplicate.
         <label className="check"><input type="checkbox" checked={false} onChange={() => setUnknown(false)} />Allow another creation attempt</label></div>}
       <div className="actions"><button className="primary" disabled={pending || unknown}>{pending ? 'Creating…' : 'Create incident'}</button></div>

@@ -71,8 +71,8 @@ test('real API create, cooperative pause during resume, refresh, diagnosis and s
   await expect(page.locator('#evidence-H1')).toBeFocused();
   await expect(page.getByText('Hypothesis · unconfirmed')).toBeVisible();
   const before = await (await request.get('/api/investigations/' + uuid)).json();
-  await page.getByRole('button', { name: 'Read saved result' }).click();
-  await expect(page.getByRole('button', { name: 'Read saved result' })).toBeEnabled();
+  const saved = await request.post('/api/investigations/' + uuid + '/resume');
+  expect(saved.status()).toBe(200);
   const after = await (await request.get('/api/investigations/' + uuid)).json();
   expect(after.charged).toEqual(before.charged); expect(after.attempts).toEqual(before.attempts);
   expect(cli('resume', uuid).charged).toEqual(before.charged);

@@ -174,8 +174,15 @@ jobs:
           python -c '
           import json, urllib.request, urllib.error
           response = urllib.request.urlopen("http://127.0.0.1:8080/")
-          assert b"IncidentClue" in response.read()
+          html = response.read()
+          assert b"IncidentClue" in html
           assert "script-src" in response.headers["Content-Security-Policy"]
+          import re
+          asset = re.search(rb"src=\x22([^\x22]+\.js)\x22", html).group(1).decode()
+          for path in (asset, "/api/health"):
+              headers = urllib.request.urlopen("http://127.0.0.1:8080" + path).headers
+              assert headers["X-Content-Type-Options"] == "nosniff"
+              assert "script-src" in headers["Content-Security-Policy"]
           request = urllib.request.Request("http://127.0.0.1:8080/api/investigations", data=b"x" * 100001, method="POST")
           try:
               urllib.request.urlopen(request)

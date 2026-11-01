@@ -38,6 +38,19 @@ describe('incident form', () => {
     fireEvent.change(screen.getByLabelText('Health snapshot · JSON'), { target: { value: '{invalid' } });
     await user.click(screen.getByRole('button', { name: 'Create incident' }));
     expect(screen.getByRole('alert').textContent).toContain('Health snapshot: invalid JSON'); expect(fetch).not.toHaveBeenCalled();
+    expect(screen.getByLabelText('Health snapshot · JSON').getAttribute('aria-invalid')).toBe('true');
+    expect(document.activeElement).toBe(screen.getByLabelText('Health snapshot · JSON'));
+  });
+  it('keeps an unfinished form in memory across UUID navigation', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(Response.json(inspection())));
+    render(<App />); const user = userEvent.setup();
+    await user.type(screen.getByLabelText('Incident ID'), 'draft-001');
+    await user.type(screen.getByLabelText('Investigation UUID'), id);
+    await user.click(screen.getByRole('button', { name: 'Open' }));
+    await screen.findByText('Created paused. No attempts charged. Resume starts execution.');
+    await user.click(screen.getByRole('link', { name: 'New incident' }));
+    await screen.findByRole('heading', { name: 'New incident' });
+    expect((screen.getByLabelText('Incident ID') as HTMLInputElement).value).toBe('draft-001');
   });
 });
 describe('execution observation', () => {
@@ -91,5 +104,16 @@ describe('execution observation', () => {
     await screen.findByText('Incompatible runtime');
     expect(screen.getByText('No validated diagnosis saved.')).toBeTruthy();
     expect((screen.getByRole('button', { name: 'Resume' }) as HTMLButtonElement).disabled).toBe(true);
+  });
+  it('shows a completed diagnosis before budgets and removes execution actions', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(Response.json(inspection({ status: 'completed', state: {
+      diagnosis: { status: 'insufficient_evidence', probable_cause: null, evidence_ids: [], missing_evidence: ['Logs'], next_checks: [] },
+    } }))));
+    window.location.hash = '/investigations/' + id; render(<App />);
+    await screen.findByText('Insufficient evidence');
+    expect(screen.queryByRole('button', { name: 'Resume' })).toBeNull();
+    expect(screen.queryByLabelText('Pause after')).toBeNull();
+    const result = screen.getByText('Insufficient evidence');
+    expect(result.compareDocumentPosition(screen.getByText('Model attempts')) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 });
