@@ -1,34 +1,56 @@
-# IncidentClue backend
+# Backend
 
-The package also includes `incidentclue.api.app:create_app`, a FastAPI app factory
-for the shared durable lifecycle. Start it with `python -m uvicorn
-incidentclue.api.app:create_app --factory --host 127.0.0.1 --port 8000 --env-file .env`
-from the repository root. Initialize PostgreSQL explicitly using `incidentclue
-db-init --env-file .env` first. See the repository's `docs/http-api.md` for the
-HTTP contract, Compose setup and recovery limitations. The CLI remains supported.
+Python + FastAPI service for incident investigation. Use the
+[Docker quick start](../README.md#quick-start) to run the complete application.
 
-Python package for structured software-incident diagnosis and bounded read-only investigation. Requires Python 3.12 or newer.
+## Features
 
-The installed command is `incidentclue`. Run `incidentclue --help` for available commands. Incident JSON and optional synthetic health snapshots are supplied through explicit paths; they are not bundled into the Python package. Provider credentials come from the process environment or an explicit `--env-file` and are never distributed with the package.
+- Validated incident inputs and evidence-linked diagnoses.
+- Bounded LangGraph workflow with read-only health/log tools.
+- PostgreSQL checkpoints and recovery.
+- Shared investigation engine for the REST API and CLI.
 
-From the full repository root, install development dependencies with:
+## Native development
+
+Requires Python 3.12+. From the repository root:
+
+```sh
+python -m venv .venv
+```
+
+Activate with `.\.venv\Scripts\Activate.ps1` in PowerShell or
+`source .venv/bin/activate` on macOS/Linux, then install:
 
 ```sh
 python -m pip install -c backend/requirements-dev.lock.txt -e "./backend[dev]"
-python -m ruff check --config backend/pyproject.toml backend
-python -m pytest backend/tests -q
-python -m build --no-isolation backend
 ```
 
-The source distribution and wheel contain the backend package; integration fixtures and the test suite belong to the full repository checkout. See the repository README for synthetic examples, configuration, known limitations, and CI details.
+Configure a root `.env` from [.env.example](../.env.example), preserving existing
+values. Set `INCIDENTCLUE_DATABASE_URL` for PostgreSQL and `GROQ_API_KEY` for new
+model requests. Start the native API:
 
-`start`, `inspect`, `pause`, and `resume` use PostgreSQL checkpoints through the
-shared lifecycle service. Run `db-init` explicitly first. `diagnose` and
-`investigate` remain database-independent. Configuration is read from process
-environment or an explicit `--env-file`, never from a default directory search.
-See [durable lifecycle usage](https://github.com/Danven-Ong/IncidentClue/blob/main/docs/checkpoint-resume.md).
+```sh
+docker compose --profile web up -d --wait postgres
+python -m incidentclue.cli db-init --env-file .env
+python -m uvicorn incidentclue.api.app:create_app --factory --host 127.0.0.1 --port 8000 --env-file .env --no-access-log
+```
 
-PostgreSQL integration tests are skipped unless `INCIDENTCLUE_TEST_DATABASE_URL`
-names an isolated test database. The tests create application/checkpointer tables
-and test records there, including actual process-death and concurrency cases.
-Routine tests use fake provider responses and require no live provider key.
+Process variables override the env file. Restart Uvicorn after configuration changes.
+
+## Tests and package checks
+
+With the development environment active, from the repository root:
+
+```sh
+python -m ruff check --config backend/pyproject.toml backend
+python -m pytest backend/tests -q
+python -m pip check
+python -m build --no-isolation --outdir dist/backend backend
+```
+
+Tests use fake providers. Database cases require `INCIDENTCLUE_TEST_DATABASE_URL`
+pointing to an isolated test database; otherwise they skip. They create tables
+and records, so keep saved work separate.
+
+See the [HTTP API](../docs/http-api.md), [workflow](../docs/workflow.md) and
+[CLI guide](../docs/cli.md) for usage and behavior.
