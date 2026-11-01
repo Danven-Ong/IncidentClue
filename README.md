@@ -1,5 +1,9 @@
 # IncidentClue
 
+The local FastAPI service exposes the same durable lifecycle as the retained CLI.
+See [HTTP API setup and contract](docs/http-api.md) for create, inspect, resume,
+cooperative pause, error semantics and local Compose usage.
+
 Investigate Software Outages with AI.
 
 IncidentClue is designed to analyze logs, service health, and deployment events, then produce a structured diagnosis with supporting evidence and suggested diagnostic checks. The application is organized into a Python backend and a future web frontend.

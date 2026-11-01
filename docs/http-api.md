@@ -89,3 +89,57 @@ IDs, cooperative pause, contention, credential-free reads and sanitized failures
 Real PostgreSQL tests exercise stored checkpoints and API/CLI ownership. Process
 crash tests cover safe replay and conservative refusal. CI retains package,
 Linux/Windows, PostgreSQL and container/Compose checks without live provider calls.
+
+## Run locally
+
+Install using the existing development lockfile instructions in the backend
+README. Keep your existing `.env`; add missing settings from `.env.example`
+without overwriting provider credentials. Neither app import nor app creation
+searches for an env file implicitly.
+
+```sh
+docker compose --profile web up -d --wait postgres
+incidentclue db-init --env-file .env
+python -m uvicorn incidentclue.api.app:create_app --factory --host 127.0.0.1 --port 8000 --env-file .env --no-access-log
+```
+
+Open `/docs` on the local server for the generated API schema and interactive
+requests. A minimal creation body (empty health evidence means unavailable data,
+not a healthy service) is:
+
+```json
+{
+  "incident": {"incident_id": "demo", "service": "checkout", "summary": "Startup failed", "evidence": []},
+  "health": {"service": "checkout", "evidence": []}
+}
+```
+
+POST this JSON to `/investigations`, copy the returned investigation_id, then
+POST `/investigations/UUID/resume?pause_after=decide`. GET the inspection URL to
+read state; POST its `/resume` suffix to continue, or `/pause` to request a stop
+from another client. Supplying recorded health/log evidence uses the same JSON
+models as `data/synthetic/checkout-health.json` and `checkout-logs.json`.
+
+For the container service, the explicit CLI initialization can instead run in
+Compose. The host CLI uses localhost:55432; the Compose CLI/API use postgres:5432:
+
+```sh
+docker compose build web
+docker compose run --rm durable db-init
+docker compose --profile web up -d --wait web
+```
+
+The API is published at `http://127.0.0.1:8000`; override `INCIDENTCLUE_WEB_PORT`
+if occupied. PostgreSQL uses the existing `postgres-data` volume. `.env` is a
+read-only provider configuration mount; the container DSN comes from the Compose
+environment and takes precedence over any host DSN in that file. Override
+`INCIDENTCLUE_COMPOSE_DATABASE_URL` when changing the database/user/password.
+Provider/model settings are loaded at server creation; restart the server to
+apply changes. Saved investigations retain their original model.
+
+`docker compose --profile web stop web postgres` stops work while retaining
+volumes. Never use `down -v` to pause work: it deletes stored investigations.
+Starting the web service against uninitialized storage reports unhealthy/503;
+run explicit db-init, then retry readiness. Health does not need a provider key.
+Long resumes occupy a worker thread and two DB connections; thread capacity is
+finite. This local service has no throughput claim or public-access controls.

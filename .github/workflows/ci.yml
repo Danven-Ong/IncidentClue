@@ -152,6 +152,17 @@ jobs:
           '
           docker compose --profile durable down
 
+      - name: Verify HTTP service and API-created state through server and database restart
+        run: |
+          docker compose --profile web up -d --wait web
+          investigation_id=$(python backend/tests/compose_api_smoke.py http://127.0.0.1:8000 /tmp/http-created.json create)
+          docker compose run --rm -T durable inspect "$investigation_id" > /tmp/http-via-cli.json
+          python -c 'import json; assert json.load(open("/tmp/http-created.json"))["state"] == json.load(open("/tmp/http-via-cli.json"))["state"]'
+          docker compose restart postgres web
+          docker compose --profile web up -d --wait web
+          python backend/tests/compose_api_smoke.py http://127.0.0.1:8000 /tmp/http-created.json inspect
+          docker compose --profile web down
+
   postgres:
     name: PostgreSQL recovery (Python ${{ matrix.python }})
     runs-on: ubuntu-latest
