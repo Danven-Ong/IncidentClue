@@ -2,7 +2,7 @@
 
 from contextlib import ExitStack
 from hashlib import sha256
-from importlib.metadata import version
+from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
 from uuid import uuid4
 
@@ -22,6 +22,8 @@ from incidentclue.persistence import (
 )
 from incidentclue.schemas import Diagnosis, Evidence, Incident
 from incidentclue.tools import HealthSnapshot, LogSnapshot
+from incidentclue.rag import RetrievalError
+from incidentclue.rag.context import RetrievalPin, pin_corpus, retrieve, validate_sources
 
 NODES = ("decide", "execute", "diagnose", "validate")
 
@@ -40,22 +42,31 @@ class SavedState(BaseModel):
     stop_reason: str
     raw_diagnosis: str | None = None
     diagnosis: Diagnosis | None = None
+    retrieval: dict | None = None
+    retrieved_sources: list[dict] = Field(default_factory=list)
 
     @model_validator(mode="after")
     def history_matches_budget(self):
         if len(self.tool_history) != self.tool_calls_used:
             raise ValueError("Saved tool history and budget disagree.")
+        pin = RetrievalPin.model_validate(self.retrieval) if self.retrieval is not None else None
+        if self.retrieved_sources and pin is None:
+            raise ValueError("Saved sources require a pinned corpus.")
+        validate_sources(self.retrieved_sources, pin=pin, evidence_ids=[e.id for e in self.evidence])
+        if sum(h["name"] == "get_runbook_context" for h in self.tool_history) > 1:
+            raise ValueError("Saved retrieval history exceeds one lookup.")
         return self
 
 
 def runtime_fingerprint() -> dict:
     """Fail closed on changed execution code/dependencies, including installed wheels."""
     sources = sha256()
-    for path in sorted(Path(__file__).parent.glob("*.py")):
-        sources.update(path.name.encode())
+    directory = Path(__file__).parent
+    for path in sorted([*directory.rglob("*.py"), directory / "rag/artifact.json"]):
+        sources.update(path.relative_to(directory).as_posix().encode())
         sources.update(path.read_bytes().replace(b"\r\n", b"\n"))
     return {
-        "graph_contract": 1,
+        "graph_contract": 2,
         "source_sha256": sources.hexdigest(),
         "dependencies": {name: version(name) for name in (
             "langgraph", "langgraph-checkpoint", "langgraph-checkpoint-postgres",
@@ -66,13 +77,27 @@ def runtime_fingerprint() -> dict:
     }
 
 
+def execution_fingerprint(retrieval):
+    result = runtime_fingerprint()
+    if retrieval is not None:
+        dependencies = {}
+        for name in ("fastembed", "onnxruntime", "numpy", "tokenizers", "pgvector"):
+            try:
+                dependencies[name] = version(name)
+            except PackageNotFoundError:
+                dependencies[name] = None
+        result["retrieval_dependencies"] = dependencies
+    return result
+
+
 def graph_config(identifier: str) -> dict:
     return {"configurable": {"thread_id": identifier}, "recursion_limit": GRAPH_RECURSION_LIMIT}
 
 
 class Lifecycle:
-    def __init__(self, db: Database):
+    def __init__(self, db: Database, *, model_directory=None):
         self.db = db
+        self.model_directory = model_directory
         db.require_initialized()
 
     def _graph(self, row: dict, client=None):
@@ -84,9 +109,13 @@ class Lifecycle:
         except (ValidationError, KeyError, TypeError):
             raise PersistenceError("Saved inputs are incompatible or invalid.") from None
         identifier = str(row["id"])
+        saved_pin = inputs.get("retrieval")
         return build_investigation_graph(
             client, health, model, logs=logs, checkpointer=self.db.saver,
             run_node=lambda name, state, node: self.db.run_node(identifier, name, state, node),
+            retrieval=saved_pin,
+            runbook_lookup=(lambda incident: retrieve(self.db.connection,
+                RetrievalPin.model_validate(saved_pin), incident, self.model_directory)) if saved_pin else None,
         )
 
     def _initialize_state(self, row: dict, graph):
@@ -95,7 +124,8 @@ class Lifecycle:
         if not snapshot.values:
             if self.db.attempts(str(row["id"])):
                 raise RecoveryRequired("Saved graph state is missing after charged attempts.")
-            initial = initial_investigation_state(Incident.model_validate(row["inputs"]["incident"]))
+            initial = initial_investigation_state(Incident.model_validate(row["inputs"]["incident"]),
+                                                  row["inputs"].get("retrieval"))
             # Save the initial input and START transition, without any physical call.
             graph.invoke(initial, config, interrupt_before=["decide"], durability="sync")
             snapshot = graph.get_state(config)
@@ -107,14 +137,18 @@ class Lifecycle:
         return snapshot
 
     def start(self, incident: Incident, health: HealthSnapshot, model: str = DEFAULT_MODEL,
-              *, logs: LogSnapshot | None = None, paused: bool = False) -> str:
+              *, logs: LogSnapshot | None = None, paused: bool = False, corpus_id=None) -> str:
         if not model.strip() or len(model) > 200:
             raise ConfigurationError("The model must be nonblank and at most 200 characters.")
         initial_investigation_state(incident)  # Validate bounds before database writes.
+        try:
+            retrieval = pin_corpus(self.db.connection, corpus_id).model_dump(mode="json") if corpus_id is not None else None
+        except RetrievalError:
+            raise ConfigurationError("Configured retrieval corpus is unavailable or incompatible.") from None
         identifier = str(uuid4())
         self.db.create(identifier, {
-            "incident": incident, "health": health, "logs": logs, "model": model,
-        }, runtime_fingerprint())
+            "incident": incident, "health": health, "logs": logs, "model": model, "retrieval": retrieval,
+        }, execution_fingerprint(retrieval))
         with self.db.execution(identifier):
             row = self.db.get(identifier)
             self._initialize_state(row, self._graph(row))
@@ -135,7 +169,8 @@ class Lifecycle:
             "status": row["status"],
             "executing": executing,
             "recovery_needed": row["status"] == "running" and not executing,
-            "compatible": row["runtime"] == runtime_fingerprint(),
+            "compatible": row["runtime"] == execution_fingerprint(row["inputs"].get("retrieval")),
+            "retrieval": row["inputs"].get("retrieval"),
             "pause_requested": row["pause_requested"],
             "model": row["inputs"]["model"],
             "error_code": row["error_code"],
@@ -170,7 +205,7 @@ class Lifecycle:
                         error.cause = row["error_code"]
                         raise error
                     raise InvestigationFailed(message, row["error_code"])
-                if row["runtime"] != runtime_fingerprint():
+                if row["runtime"] != execution_fingerprint(row["inputs"].get("retrieval")):
                     raise IncompatibleRuntime("Saved investigation is incompatible with this runtime; resume refused.")
                 attempts = self.db.attempts(identifier)
                 if any(item["status"] == "in_flight" for item in attempts):
@@ -202,6 +237,9 @@ class Lifecycle:
                 except APIError:
                     self.db.status(identifier, "failed", "provider_error")
                     raise ExecutionFailed("Provider request failed; investigation is failed and attempts remain charged.", "provider_error") from None
+                except RetrievalError:
+                    self.db.status(identifier, "failed", "retrieval_error")
+                    raise ExecutionFailed("Runbook lookup failed; inspect saved progress and charged attempts.", "retrieval_error") from None
                 except (DiagnosisError, InputLimitError, ValidationError):
                     self.db.status(identifier, "failed", "validation_error")
                     raise ExecutionFailed("Investigation validation failed; inspect the saved progress.", "validation_error") from None
@@ -228,6 +266,8 @@ class Lifecycle:
                 state = graph.get_state(config)
                 if state.next != ("__start__",):
                     SavedState.model_validate(state.values)
+                    if state.values.get("retrieval") != row["inputs"].get("retrieval"):
+                        raise DiagnosisError("Saved graph retrieval differs from pinned inputs.")
                 if not state.next:
                     if "diagnosis" not in state.values:
                         raise RecoveryRequired("Graph has no next node and no validated diagnosis.")

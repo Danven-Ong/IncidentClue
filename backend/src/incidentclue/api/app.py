@@ -20,12 +20,16 @@ class Settings:
     database_url: str = field(default="", repr=False)
     provider_key: str = field(default="", repr=False)
     model: str = DEFAULT_MODEL
+    retrieval_corpus: str | None = None
+    model_directory: str | None = field(default=None, repr=False)
 
     @classmethod
     def from_environment(cls):
         return cls(database_url=os.environ.get("INCIDENTCLUE_DATABASE_URL", ""),
                    provider_key=os.environ.get("GROQ_API_KEY", ""),
-                   model=os.environ.get("GROQ_MODEL", DEFAULT_MODEL))
+                   model=os.environ.get("GROQ_MODEL", DEFAULT_MODEL),
+                   retrieval_corpus=os.environ.get("INCIDENTCLUE_RAG_CORPUS_ID") or None,
+                   model_directory=os.environ.get("INCIDENTCLUE_RAG_MODEL_DIR") or None)
 
 
 class RequestGuard:

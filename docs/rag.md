@@ -3,8 +3,10 @@
 Synthetic fixtures and the no-RAG evaluation runner are available. The optional
 `incidentclue.rag` module now implements corpus validation, local CPU embeddings,
 explicit schema setup, immutable ingestion, exact cosine lookup and a PostgreSQL
-full-text comparison. Investigation/graph integration and diagnosis source
-citations remain pending. These administrative operations do not call Groq.
+full-text comparison. Optional durable graph integration now pins retrieval
+settings, charges a lookup within the existing tool budget, and saves separate
+source citations for CLI/API/browser inspection. Administrative operations do not
+call Groq; integration tests use fake model responses. Live quality is unmeasured.
 
 The seven storage tests pass against an isolated PostgreSQL 17/vector 0.8.1
 container, using deterministic test vectors. No application extension image has
@@ -84,14 +86,66 @@ quantities, neither a probability of incident causation.
 
 These probes accept a bounded explicit query (at most 2,000 UTF-8 bytes, and 200
 embedding tokens for vector mode). They do not perform an investigation or access
-its attempt ledger. The future graph tool must construct its query from saved
-observations in Python, validate the exact service, and reserve its existing tool
-budget **before** embedding/SQL; this increment does not bypass or implement that
-integration. Keep runbooks separate from observations throughout.
-Before graph integration, extend the conservative runtime fingerprint to cover
-this subpackage and its executed optional dependencies. The current investigation
-fingerprint is unchanged because the investigation runtime does not import or
-execute this administrative module.
+its attempt ledger. The integrated graph tool constructs its own query from saved
+observations, validates the exact service, and reserves the existing tool budget
+before local model loading, query embedding or SQL. Runbooks stay separate from
+observations. The fingerprint now covers nested runtime code, the packaged
+artifact and executed optional dependencies on retrieval-enabled runs.
+
+## Opt-in durable investigation
+
+Prepare and ingest explicitly, installing optional dependencies before creating
+RAG investigations. For native CLI use, pass the exact corpus ID:
+
+```sh
+python -m incidentclue.cli start data/synthetic/checkout-startup.json --health-file data/synthetic/checkout-health.json --runbooks CORPUS_SHA256 --paused --env-file .env
+```
+
+For new investigations on a native API server, set `INCIDENTCLUE_RAG_CORPUS_ID`
+in its process environment. Set `INCIDENTCLUE_RAG_MODEL_DIR` to the verified model
+directory for lookup. HTTP creation payloads/routes are unchanged, with no browser
+toggle. Default is disabled. One-shot `diagnose`/`investigate` remain non-RAG and
+database-independent. Compose retains its original image/dependencies: native
+optional setup does not imply the application container supports embeddings.
+
+Creation reads the prepared corpus and saves corpus/artifact/config hashes plus
+the query policy, with zero charged attempts and no embedding/provider calls.
+Later configuration changes affect new investigations; existing runs retain their
+saved pin. Missing configuration/storage is an error, never a fabricated no-match.
+
+`get_runbook_context(service)` is offered only on opted-in investigations and can
+execute once, competing with health/logs for the same two total tool attempts.
+Lookup failures keep their charge and fail execution. A reservation with uncertain
+output refuses replay; a committed output is reused after a crash even if its
+graph checkpoint was not saved. There are still three model requests at most,
+with the existing 512-selection/1024-diagnosis caps and reasoning policy.
+
+Query policy `summary-observations-prefix-200tokens-v1` concatenates only the saved
+summary and currently available observation contents in saved order. It takes a
+UTF-8-safe 2,000-byte prefix, then shortens that prefix until the pinned tokenizer
+counts at most 200 tokens. The saved tool result records policy, query hash, byte
+count and truncation. IDs, labels, paths and retrieved text are not query inputs.
+The complete bounded incident evidence still reaches diagnosis when the query
+is shortened. This policy and the distance cutoff require development calibration.
+
+Passages remain in `retrieved_sources`; they never become observations. Strict
+generation requests require separate `source_ids`, validated only against returned
+passages in the pinned corpus. Reject duplicate/conflicting/foreign sources and
+evidence/source collisions. Hypotheses still need incident `evidence_ids`.
+Membership checks cannot prove semantic support. Guidance may help judgment and
+checks, but cannot create missing incident facts.
+
+CLI JSON and HTTP inspection expose the pin, excerpts and citations. Browser
+citations focus the exact saved excerpt in a separate Runbook guidance section;
+version, hash, section/lines and repository-relative location remain readable.
+HTML/URLs are displayed as text, never executed. Legacy saved diagnoses without
+`source_ids` remain readable as an empty list. Inspection and completed resume do
+not reload corpus/model files or require provider keys.
+
+The fingerprint is now graph contract version 2. Changed code or optional
+dependencies can make unfinished runs incompatible; preserve their data and
+inspectability, refusing resume without reset/migration. Install optional
+dependencies before creation rather than changing the environment mid-run.
 
 Run offline contract checks with `python -m pytest backend/tests/test_rag_retrieval.py`.
 The separate `backend/tests/test_rag_postgres.py` suite requires optional pgvector

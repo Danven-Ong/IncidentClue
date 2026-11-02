@@ -85,7 +85,7 @@ def test_requests_schema_validates_citations_and_preserves_input(
         assert body["response_format"]["json_schema"] == {
             "name": "incident_diagnosis",
             "strict": True,
-            "schema": Diagnosis.model_json_schema(),
+            "schema": diagnosis_module.GenerationDiagnosis.model_json_schema(),
         }
         assert "tools" not in body
         return httpx2.Response(200, json=diagnosis_completion)

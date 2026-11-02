@@ -42,6 +42,7 @@ class Diagnosis(BaseModel):
     evidence_ids: list[str]
     missing_evidence: list[str]
     next_checks: list[str]
+    source_ids: list[str] = Field(default_factory=list)
 
     @model_validator(mode="after")
     def validate_consistency(self) -> Self:
@@ -57,3 +58,8 @@ class Diagnosis(BaseModel):
             raise ValueError("Evidence IDs must not be blank.")
 
         return self
+
+
+class GenerationDiagnosis(Diagnosis):
+    """New strict requests require source_ids; saved legacy diagnoses may omit it."""
+    source_ids: list[str] = Field(...)

@@ -1,5 +1,14 @@
 # HTTP API
 
+Native server RAG opt-in uses `INCIDENTCLUE_RAG_CORPUS_ID` and
+`INCIDENTCLUE_RAG_MODEL_DIR` after explicit corpus preparation. Existing create
+payloads/routes are unchanged. Responses add nullable `retrieval`; saved state
+contains separate `retrieved_sources`, and diagnoses expose `source_ids` alongside
+observation `evidence_ids`. Old diagnoses may omit source IDs and remain readable.
+Create performs no model/embedding calls; completed resume/inspection read saved
+excerpts. The current Compose application image does not install RAG dependencies.
+See [RAG setup, bounds and compatibility](rag.md).
+
 FastAPI exposes the shared investigation engine for trusted local use. Start the
 application with the [Docker quick start](../README.md#quick-start), then open
 [Swagger UI](http://localhost:8000/docs) for request fields, response schemas and

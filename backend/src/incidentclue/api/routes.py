@@ -37,7 +37,7 @@ def health(request: Request):
 def operate(request, action, *, identifier=None):
     try:
         with request.app.state.database_factory(request.app.state.settings.database_url) as db:
-            return action(Lifecycle(db))
+            return action(Lifecycle(db, model_directory=request.app.state.settings.model_directory))
     except Exception as error:
         return controlled_error(error, identifier)
 
@@ -49,7 +49,8 @@ def create_investigation(payload: CreateInvestigation, request: Request, respons
         return controlled_error(ConfigurationError("Invalid configured model."))
 
     def create(service):
-        identifier = service.start(payload.incident, payload.health, model, logs=payload.logs, paused=True)
+        identifier = service.start(payload.incident, payload.health, model, logs=payload.logs, paused=True,
+                                   corpus_id=request.app.state.settings.retrieval_corpus)
         response.headers["Location"] = f"/investigations/{identifier}"
         return service.inspect(identifier)
 

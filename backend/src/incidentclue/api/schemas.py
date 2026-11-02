@@ -67,6 +67,7 @@ class Inspection(BaseModel):
     # Inspection must also expose partial/incompatible saved snapshots. Do not
     # require a resumable SavedState merely to read existing data.
     state: dict
+    retrieval: dict | None = None
     attempts: list[Attempt]
     charged: Counts
     limits: Counts

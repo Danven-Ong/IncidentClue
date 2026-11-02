@@ -55,13 +55,14 @@ def _durable_command(args) -> int:
                 db.initialize()
                 print(json.dumps({"database": "initialized"}))
                 return 0
-            service = Lifecycle(db)
+            service = Lifecycle(db, model_directory=os.environ.get("INCIDENTCLUE_RAG_MODEL_DIR"))
             if args.command == "start":
                 incident = _load_incident(args.incident)
                 health = load_health_snapshot(args.health_file)
                 logs = load_log_snapshot(args.logs_file) if args.logs_file is not None else None
                 model = args.model if args.model is not None else os.environ.get("GROQ_MODEL", DEFAULT_MODEL)
-                identifier = service.start(incident, health, model, logs=logs, paused=args.paused)
+                identifier = service.start(incident, health, model, logs=logs, paused=args.paused,
+                                           corpus_id=args.runbooks)
                 # Print identity before executing: a failure must remain inspectable.
                 print(f"Investigation ID: {identifier}", file=sys.stderr, flush=True)
                 if args.paused:
@@ -149,6 +150,7 @@ def main(argv: list[str] | None = None) -> int:
             command.add_argument("--health-file", type=Path, required=True)
             command.add_argument("--logs-file", type=Path)
             command.add_argument("--model")
+            command.add_argument("--runbooks", metavar="CORPUS_SHA256", help="Opt into the exact prepared runbook corpus; requires database and local artifacts on lookup.")
             pause_options = command.add_mutually_exclusive_group()
             pause_options.add_argument("--paused", action="store_true", help="Persist initial state without model calls.")
             pause_options.add_argument("--pause-after", choices=NODES, help="Pause after a committed node.")

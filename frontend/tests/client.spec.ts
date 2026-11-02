@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test';
 import { execFileSync } from 'node:child_process';
 import { resolve } from 'node:path';
-import { id, inspection } from '../src/testFixture';
+import { id, inspection, retrievalInspection } from '../src/testFixture';
 
 test('direct form, guarded synthetic data, local validation and narrow layout', async ({ page }) => {
   if (process.env.INCIDENTCLUE_FORM_SCREENSHOT) {
@@ -42,6 +42,22 @@ test('partial state and untrusted evidence remain readable text', async ({ page 
   await expect(page.getByText('<script>window.bad=true</script>', { exact: true })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Resume', exact: true })).toBeDisabled();
   await expect(page.getByText('No validated diagnosis saved.')).toBeVisible();
+});
+
+test('saved runbook citations focus exact excerpts and remain readable on narrow screens', async ({ page }) => {
+  await page.route('**/api/investigations/**', route => route.fulfill({ json: retrievalInspection() }));
+  await page.goto('/#/investigations/' + id);
+  await page.getByRole('button', { name: 'Dependency name resolution · Checks', exact: true }).click();
+  await expect(page.locator('article[id^="source-"]')).toBeFocused();
+  await expect(page.locator('article[id^="source-"]').getByText(/<script>window.bad=true<\/script>/)).toBeVisible();
+  expect(await page.evaluate(() => 'bad' in window)).toBe(false);
+  await page.getByText('Source identity and location', { exact: true }).click();
+  for (const width of [1280, 375]) {
+    await page.setViewportSize({ width, height: 900 });
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+    if (process.env.INCIDENTCLUE_RAG_SCREENSHOT_DIR)
+      await page.screenshot({ path: resolve(process.env.INCIDENTCLUE_RAG_SCREENSHOT_DIR, `runbooks-${width}.png`), fullPage: true });
+  }
 });
 
 test('real API create, cooperative pause during resume, refresh, diagnosis and saved result', async ({ page, request }) => {

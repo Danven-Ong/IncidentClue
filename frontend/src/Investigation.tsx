@@ -18,11 +18,32 @@ function Evidence({ value }: { value: unknown }) {
     </article>;
   })}</div>;
 }
+
+export function RunbookSources({ state }: { state: JsonObject }) {
+  const sources = Array.isArray(state.retrieved_sources) ? state.retrieved_sources : [];
+  const lookedUp = Array.isArray(state.tool_history) && state.tool_history.some(h => isObject(h) && h.name === 'get_runbook_context');
+  return <section className="content-section"><h2>Runbook guidance</h2>
+    <p className="hint">General guidance, separate from incident observations. Saved excerpts preserve the returned version.</p>
+    {!sources.length && <p className="muted">{lookedUp ? 'The lookup returned no matching passages.' : 'No runbook lookup has been saved.'}</p>}
+    <div className="evidence-list">{sources.map((s, i) => {
+      if (!isObject(s) || typeof s.id !== 'string' || typeof s.text !== 'string')
+        return <JsonDetails key={i} label="Unrecognised saved source" value={s} />;
+      return <article className="evidence" id={'source-' + encodeURIComponent(s.id)} key={s.id} tabIndex={-1}>
+        <h3>{text(s.title)} · version {text(s.document_version)}</h3>
+        <p className="muted">{text(s.section)} · lines {String(s.line_start)}–{String(s.line_end)}</p>
+        <p className="preserve">{s.text}</p>
+        <details><summary>Source identity and location</summary><p>{text(s.path)}</p>
+          <p>Document SHA256: <code>{text(s.document_sha256)}</code></p><p>Corpus: <code>{text(s.corpus_id)}</code></p></details>
+      </article>;
+    })}</div>
+  </section>;
+}
 function Diagnosis({ state }: { state: JsonObject }) {
   const d = state.diagnosis;
   if (!isObject(d)) return <p className="muted">No validated diagnosis saved.</p>;
   const known = ['hypothesis', 'insufficient_evidence'].includes(String(d.status))
     && strings(d.evidence_ids) && strings(d.missing_evidence) && strings(d.next_checks)
+    && (d.source_ids === undefined || strings(d.source_ids))
     && (d.status === 'hypothesis' ? typeof d.probable_cause === 'string' && !!d.probable_cause.trim()
       && Array.isArray(d.evidence_ids) && d.evidence_ids.length > 0 : d.probable_cause === null);
   if (!known) return <><p className="muted">Saved diagnosis format is not recognised.</p><JsonDetails label="Diagnosis details" value={d} /></>;
@@ -38,6 +59,13 @@ function Diagnosis({ state }: { state: JsonObject }) {
         }}>{id}</button> : <span key={id}><code>{id}</code> · evidence unavailable</span>;
       })}</div>}
       <p className="hint">References identify observations; they do not confirm causation.</p>
+      {strings(d.source_ids) && d.source_ids.length > 0 && <div className="references" aria-label="Runbook citations">{d.source_ids.map(id => {
+        const sources = Array.isArray(state.retrieved_sources) ? state.retrieved_sources.filter(isObject) : [];
+        const source = sources.find(s => s.id === id);
+        return source ? <button key={id} className="reference" onClick={() => {
+          const node = document.getElementById('source-' + encodeURIComponent(id)); node?.scrollIntoView({ block: 'center' }); node?.focus();
+        }}>{text(source.title)} · {text(source.section)}</button> : <span key={id}><code>{id}</code> · source unavailable</span>;
+      })}</div>}
     </div>
     <div className="result-grid"><section><h3>Missing evidence</h3>{(d.missing_evidence as string[]).length
       ? <ul>{(d.missing_evidence as string[]).map((s, i) => <li key={i}>{s}</li>)}</ul> : <p className="muted">None recorded.</p>}</section>
@@ -96,6 +124,7 @@ export function Investigation({ id }: { id: string }) {
       </section>}
       {data.status !== 'completed' && diagnosis}
       <section className="content-section"><h2>Evidence</h2><Evidence value={data.state.evidence} /></section>
+      {(isObject(data.state.retrieval) || (Array.isArray(data.state.retrieved_sources) && data.state.retrieved_sources.length > 0)) && <RunbookSources state={data.state} />}
       <section className="content-section"><h2>Saved activity</h2>
         {Array.isArray(data.state.tool_history) && data.state.tool_history.length > 0
           ? data.state.tool_history.map((item, i) => <JsonDetails key={i} label={`Tool record ${i + 1}`} value={item} />)

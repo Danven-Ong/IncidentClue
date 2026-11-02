@@ -165,7 +165,7 @@ def bound_sources(corpus_id, candidates, config, *, mode):
             "section", "line_start", "line_end", "text")}
         source.update(id=f"source:{corpus_id}:{passage_id}", corpus_id=corpus_id,
                       rank=len(sources) + 1,
-                      distance=float(row["score"]) if mode == "vector" else None)
+                      distance=max(0.0, min(2.0, float(row["score"]))) if mode == "vector" else None)
         if mode == "lexical":
             source["lexical_score"] = float(row["score"])
         size = len(source["text"].encode("utf-8"))
