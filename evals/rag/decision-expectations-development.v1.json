@@ -1,0 +1,81 @@
+{
+  "annotation_version": 1,
+  "status": "proposed_assistant_annotations_not_independent_ground_truth",
+  "fixture_sha256": "e25ab7f40b4afa21f6ecf648982df1474bad2c741c83456cd42b9f872905a6b7",
+  "split": "development",
+  "runtime_use_permitted": false,
+  "cases": [
+    {
+      "id": "case-01",
+      "expected_status": "hypothesis",
+      "supported_scope": "Initialization is blocked by the observed absent required process setting.",
+      "unsupported_extension": "Who removed it, which deployment caused it, or why configuration distribution failed."
+    },
+    {
+      "id": "case-02",
+      "expected_status": "hypothesis",
+      "supported_scope": "The observed hostname lookup failed with NXDOMAIN before any connection attempt.",
+      "unsupported_extension": "DNS misconfiguration, an unavailable dependency process, or a network transport failure as the established deeper cause."
+    },
+    {
+      "id": "case-03",
+      "expected_status": "hypothesis",
+      "supported_scope": "The observed delay is at connection acquisition while the pool is fully checked out; observed query duration is short.",
+      "unsupported_extension": "A connection leak, undersizing, or slow database execution as the established underlying cause."
+    },
+    {
+      "id": "case-04",
+      "expected_status": "hypothesis",
+      "supported_scope": "The recorded application/database schema incompatibility explains startup rejection.",
+      "unsupported_extension": "A failed migration or an identified deployment mistake without supporting observations."
+    },
+    {
+      "id": "case-05",
+      "expected_status": "hypothesis",
+      "supported_scope": "The supplied measurements locate the observed delay in downstream response time, with a short handshake and elevated downstream latency in the same interval.",
+      "unsupported_extension": "A proven deeper dependency fault, exact request-level attribution beyond the measurements, or a DNS/connection-handshake cause."
+    },
+    {
+      "id": "case-06",
+      "expected_status": "hypothesis",
+      "supported_scope": "The instance is still warming its cache; recorded readiness reason and increasing progress explain current non-readiness.",
+      "unsupported_extension": "Permanent failure, a stuck warm-up, or a defect requiring remediation."
+    },
+    {
+      "id": "case-07",
+      "expected_status": "insufficient_evidence",
+      "required_gap": "Which unverified sample represents the affected instances and requests in that interval.",
+      "useful_checks": "Verify sample origins and correlate pool waits with affected requests before selecting an explanation."
+    },
+    {
+      "id": "case-08",
+      "expected_status": "insufficient_evidence",
+      "required_gap": "Which worker/request paths experienced each resolver or connection outcome; a common incident cause is not established.",
+      "useful_checks": "Correlate worker/request identities and timestamps with resolution and connection outcomes."
+    },
+    {
+      "id": "case-09",
+      "expected_status": "insufficient_evidence",
+      "required_gap": "The slow request phase or component is not identified by aggregate latency alone.",
+      "useful_checks": "Collect phase timings and correlated dependency/pool observations."
+    },
+    {
+      "id": "case-10",
+      "expected_status": "insufficient_evidence",
+      "required_gap": "The error mechanism and its relationship to the release are unknown; timing alone does not establish causation.",
+      "useful_checks": "Inspect error categories and version/compatibility observations around affected requests."
+    },
+    {
+      "id": "case-11",
+      "expected_status": "hypothesis",
+      "supported_scope": "The observed append failed because the mounted volume reports zero free bytes and ENOSPC.",
+      "unsupported_extension": "A proven leak, retention-policy problem, or explanation of what consumed the space."
+    },
+    {
+      "id": "case-12",
+      "expected_status": "insufficient_evidence",
+      "required_gap": "User reports alone do not identify an upload failure mechanism.",
+      "useful_checks": "Obtain failed-request details and correlated application/dependency observations."
+    }
+  ]
+}

@@ -56,7 +56,42 @@ This foundation does not implement ingestion, retrieval or source citations.
 python evals/rag/review.py /path/to/baseline.jsonl --output /path/outside/repository/review.json
 ```
 
-Review defaults to development cases; held-out review requires `--split held_out`.
+Development review defaults to `--contract decision-v2`. Its evaluator-only
+[`decision-expectations-development.v1.json`](decision-expectations-development.v1.json)
+separates expected diagnosis status from retrieval category: seven expected
+hypotheses and five expected abstentions across the full development split.
+The disk-full no-guidance case still expects a bounded explanation; no-guidance
+does not itself require abstention. These annotations are assistant proposals,
+not independently reviewed ground truth. Claim-scope/gap descriptions guide manual
+review; the automatic reviewer checks expected status, not their semantic content.
+
+[`decision-contract.v2.json`](decision-contract.v2.json) pins the annotation hash,
+version, split, provenance and original fixture version. Reviews record the
+selected contract, its combined hash (including reviewer/manifest/annotation
+hashes), and annotation provenance. Reject mismatched hashes, versions, incomplete
+or duplicate case sets, inconsistent required abstentions and invalid scope fields.
+Frozen inputs, original labels/rubric and `frozen.json` are unchanged. Keep old
+contract files and reports when introducing later versions.
+
+`expected_status_counts` gives planned, assessed, matched, mismatched and
+unassessed counts separately for both expected statuses, over the cases selected
+in that report. `unexpected_abstentions` includes all expected-positive cases,
+including diagnostic no-guidance cases; `unexpected_hypotheses` counts failures to
+abstain. Execution errors and unattempted cases never count as status mismatches.
+The existing `answerable_cases_abstained` retains its category-specific meaning
+and covers only the six cases labelled `answerable`.
+
+Use `--contract legacy-v1` to retain the previous checks without the new annotation
+targets; new target counters are `null` in that mode. A legacy review made by this
+version records this reviewer's hash; exact reproduction of older output hashes
+requires the original reviewer revision. Existing saved reviews are never rewritten.
+Held-out decision annotations have not been reviewed, so held-out review requires
+explicitly selecting the legacy contract:
+
+```bash
+python evals/rag/review.py /path/to/held-out.jsonl --split held_out --contract legacy-v1 --output /path/outside/repository/held-out-review.json
+```
+
 It checks frozen input hashes and reports missed abstentions, answerable cases
 that abstained, citation membership and missing-evidence presence. Execution errors
 and unattempted cases stay unassessed. Labels are read only by the evaluator.
@@ -64,4 +99,7 @@ and unattempted cases stay unassessed. Labels are read only by the evaluator.
 Each report is reviewed separately; reruns do not replace earlier failures.
 Automatic checks cannot establish causal support or the usefulness of checks.
 Passing them still requires manual semantic review; fake responses establish no
-model quality. The command makes no provider calls and refuses output overwrite.
+model quality. `quality_pass` stays `null` after automatic success and `false`
+after failure under either contract. A matching status is not a supported diagnosis.
+The command makes no provider calls and refuses output overwrite. Neither
+generation nor retrieval reads the new evaluator-only annotation/manifest files.
