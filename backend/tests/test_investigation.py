@@ -155,6 +155,50 @@ def test_model_can_skip_lookup_and_still_get_validated_final(incident, health):
     assert all(item["role"] != "tool" for item in requests[1]["messages"])
 
 
+@pytest.mark.parametrize("path", ["skip", "one", "two", "repeat", "tool_error", "provider_error"])
+def test_final_instruction_replacement_preserves_saved_history(
+    incident, health, logs, selection, log_selection, path, monkeypatch,
+):
+    from langgraph.checkpoint.memory import InMemorySaver
+
+    responses = [completion({"content": "done"})]
+    if path != "skip":
+        following = completion({"content": "done"})
+        if path == "two":
+            following = log_selection
+            following["choices"][0]["message"]["tool_calls"][0]["id"] = "call-logs"
+        elif path == "repeat":
+            following = deepcopy(selection)
+            following["choices"][0]["message"]["tool_calls"][0]["id"] = "call-repeat"
+        responses = [selection, following]
+    responses.append(400 if path == "provider_error" else abstention())
+    if path == "tool_error":
+        def unavailable(*args, **kwargs):
+            raise OSError("private failure")
+        monkeypatch.setattr(investigation, "get_service_health", unavailable)
+    requests = []
+    with fake_client(responses, requests) as client:
+        graph = investigation.build_investigation_graph(
+            client, health, logs=logs, checkpointer=InMemorySaver())
+        config = {"configurable": {"thread_id": "final-message-test"}}
+        graph.invoke(investigation.initial_investigation_state(incident), config,
+                     interrupt_before=["diagnose"])
+        checkpoint = graph.get_state(config)
+        history = deepcopy(checkpoint.values["messages"])
+        assert history[0] == {"role": "system", "content": investigation.TOOL_INSTRUCTIONS}
+        if path == "provider_error":
+            with pytest.raises(APIStatusError):
+                graph.invoke(None, config)
+        else:
+            graph.invoke(None, config)
+        assert graph.get_state(config).values["messages"] == history
+        assert graph.get_state(checkpoint.config).values["messages"] == history
+    assert requests[-1]["messages"] == [
+        {"role": "system", "content": investigation.FINAL_INSTRUCTIONS}, *history[1:]]
+    assert all(request["messages"][0] == history[0] for request in requests[:-1])
+    assert "Do not write a diagnosis here" not in requests[-1]["messages"][0]["content"]
+
+
 @pytest.mark.parametrize("model", [DEFAULT_MODEL, "openai/gpt-oss-120b", "custom-test-model"])
 def test_selection_policy_scopes_tools_and_keeps_generation_caps(incident, health, logs, model):
     requests = []

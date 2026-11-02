@@ -8,15 +8,17 @@ import time
 from types import SimpleNamespace
 
 from openai import APIStatusError
+from pydantic import ValidationError
 from incidentclue.investigation import investigate_incident
 from incidentclue.diagnosis import DiagnosisError
 from incidentclue.lifecycle import runtime_fingerprint
 from incidentclue.llm import DEFAULT_MODEL, create_groq_client
-from incidentclue.schemas import Incident
+from incidentclue.schemas import Diagnosis, Incident
 from incidentclue.tools import HealthSnapshot, LogSnapshot
 
 ROOT = Path(__file__).resolve().parents[2]
 SUITE = Path(__file__).resolve().parent
+MAX_DIAGNOSTIC_CHARACTERS = 16_384
 
 
 def load(path):
@@ -168,24 +170,90 @@ def provider_error_details(error):
     return result
 
 
+def rejected_generation_details(error, *, diagnosis):
+    """Inspect bounded JSON shape; omit values, arbitrary keys and error text."""
+    result = {"availability": "absent", "truncation": "unknown"}
+    if not isinstance(error, APIStatusError) or not isinstance(error.body, dict):
+        return result
+    details = error.body.get("error", error.body)
+    if not isinstance(details, dict) or "failed_generation" not in details:
+        return result
+    content = details["failed_generation"]
+    if not isinstance(content, str):
+        return {**result, "availability": "not_text"}
+    result.update(availability="present", character_count=len(content))
+    if len(content) > MAX_DIAGNOSTIC_CHARACTERS:
+        return {**result, "json_status": "not_inspected_size_limit"}
+    try:
+        # Non-finite constants are not JSON. No decoder messages/positions escape.
+        def reject_constant(value):
+            raise ValueError
+        parsed = json.loads(content, parse_constant=reject_constant)
+    except RecursionError:
+        return {**result, "json_status": "not_inspected_parser_limit"}
+    except ValueError:
+        return {**result, "json_status": "invalid"}
+
+    def shape(value):
+        if value is None:
+            return "null"
+        return {dict: "object", list: "array", str: "string", bool: "boolean",
+                int: "number", float: "number"}[type(value)]
+
+    result.update(json_status="valid", top_level_type=shape(parsed))
+    if isinstance(parsed, dict):
+        # Fixed names only: arbitrary generated keys can themselves contain secrets.
+        fields = (tuple(Diagnosis.model_fields) if diagnosis
+                  else ("name", "arguments", "tool_calls", "function", "parameters"))
+        result["known_field_types"] = {name: shape(parsed[name]) for name in fields if name in parsed}
+        result["unknown_field_count"] = sum(name not in fields for name in parsed)
+    if diagnosis:
+        try:
+            Diagnosis.model_validate_json(content)
+            result["diagnosis_contract_valid"] = True
+        except ValidationError:
+            result["diagnosis_contract_valid"] = False
+    return result
+
+
 class RecordingClient:
     """Keep capture across SDK with_options copies without changing the SDK object."""
-    def __init__(self, client, requests, responses, usage):
+    def __init__(self, client, requests, responses, usage, attempts):
         self.client, self.requests, self.responses, self.usage = client, requests, responses, usage
+        self.attempts = attempts
         self.chat = SimpleNamespace(completions=self)
 
     def with_options(self, **options):
-        return RecordingClient(self.client.with_options(**options), self.requests, self.responses, self.usage)
+        return RecordingClient(self.client.with_options(**options), self.requests, self.responses,
+                               self.usage, self.attempts)
 
     def create(self, **request):
         self.requests.append(request)
-        response = self.client.chat.completions.create(**request)
+        attempt = {"attempt": len(self.requests), "phase": "diagnosis" if "response_format" in request
+                   else "selection", "status": "started", "usage": None}
+        self.attempts.append(attempt)
+        started = time.perf_counter()
+        try:
+            response = self.client.chat.completions.create(**request)
+        except Exception as error:
+            attempt.update(status="exception", error_type=type(error).__name__,
+                           elapsed_seconds=time.perf_counter() - started)
+            details = provider_error_details(error)
+            if details is not None:
+                attempt["provider_error"] = details
+            attempt["rejected_generation"] = rejected_generation_details(
+                error, diagnosis=attempt["phase"] == "diagnosis")
+            raise
+        attempt.update(status="response_received", response_index=len(self.responses),
+                       elapsed_seconds=time.perf_counter() - started)
+        choices = response.choices
         self.responses.append([choice.model_dump(mode="json") if hasattr(choice, "model_dump")
             else {"finish_reason": choice.finish_reason,
                   "message": choice.message.model_dump(mode="json")}
-            for choice in response.choices])
+            for choice in choices] if isinstance(choices, list) else choices)
         observed = getattr(response, "usage", None)
         self.usage.append(observed.model_dump(mode="json") if observed is not None else None)
+        attempt["usage"] = self.usage[-1]
         return response
 
 
@@ -222,8 +290,8 @@ def baseline(*, live, model, split, limit, output, env_file=None, case_ids=None)
             events, steps, summary = [], [], {}
             started = time.perf_counter()
             record = {"id": case["id"], "input_sha256": digest(SUITE / case["path"])}
-            requests, usage, responses = [], [], []
-            recording = RecordingClient(client, requests, responses, usage)
+            requests, usage, responses, attempts = [], [], [], []
+            recording = RecordingClient(client, requests, responses, usage, attempts)
             rate_limited = False
             try:
                 result = investigate_incident(Incident.model_validate(payload["incident"]), recording,
@@ -248,6 +316,7 @@ def baseline(*, live, model, split, limit, output, env_file=None, case_ids=None)
             record.update({"elapsed_seconds": time.perf_counter() - started,
                            "events": events, "steps": steps, "summary": summary,
                            "model_attempts": len(requests), "provider_usage": usage,
+                           "attempts": attempts,
                            "requests": requests, "responses": responses})
             stream.write(json.dumps(record) + "\n")
             stream.flush()

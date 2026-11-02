@@ -227,7 +227,8 @@ def build_investigation_graph(
             raise DiagnosisError("Model-request budget exhausted before diagnosis.")
         content = _request_diagnosis_content(
             _enriched(state), client, model,
-            [*state["messages"], {"role": "system", "content": FINAL_INSTRUCTIONS}],
+            [{"role": "system", "content": FINAL_INSTRUCTIONS},
+             *deepcopy([message for message in state["messages"] if message["role"] != "system"])],
         )
         return {"raw_diagnosis": content, "model_requests_used": state["model_requests_used"] + 1}
 

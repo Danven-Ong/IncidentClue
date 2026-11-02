@@ -25,6 +25,23 @@ The runner stops the batch on its first provider rate limit without retries.
 Known provider failures are classified by HTTP status and allowlisted error codes;
 free-text error messages and headers are excluded. Numeric `Retry-After` hints
 are recorded without automatically waiting or retrying.
+Every SDK call has an `attempts` entry shared across SDK option copies, with its
+phase, response/exception status, duration and observed usage (`null` when unknown).
+`response_received` means the SDK returned, not that diagnosis validation passed.
+Successful calls refer to a zero-based `response_index`; exceptions have no response
+index or fabricated response. `responses` and `provider_usage` retain their existing
+response-only layout, so their lengths can be smaller than `model_attempts`.
+
+For exceptions, `rejected_generation` inspects `failed_generation` only when the
+SDK exposes it as text of at most 16,384 characters. It records JSON parse status,
+top-level type, types under fixed known field names, unknown-field count and (for
+diagnosis) local contract validity. Arbitrary keys, values, excerpts, decoder and
+validation messages are excluded. Oversize/absent/non-text content and parser
+limits are explicit. Contract validity does not establish citation membership,
+semantic support or why the provider rejected a generation. Truncation remains
+`unknown`: character counts, JSON syntax and ending braces cannot prove it.
+These diagnostics cannot reconstruct content or usage missing from older reports.
+
 Use `--case-ids case-19 case-20` to select specific cases within the chosen split;
 this allows unattempted cases to run without implicitly replaying earlier ones.
 
