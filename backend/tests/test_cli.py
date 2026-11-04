@@ -216,6 +216,7 @@ def test_rejects_untrusted_citation_without_printing_a_diagnosis(
     incident_file, provider, diagnosis_data, capsys
 ):
     diagnosis_data["evidence_ids"] = ["E404"]
+    diagnosis_data["support_assessment"]["evidence_links"][0]["evidence_id"] = "E404"
     provider["payload"]["choices"][0]["message"]["content"] = json.dumps(diagnosis_data)
 
     assert cli.main(["diagnose", str(incident_file)]) == 1
@@ -228,6 +229,7 @@ def test_abstention_is_a_successful_result(
     incident_file, provider, diagnosis_data, capsys
 ):
     diagnosis_data.update(status="insufficient_evidence", probable_cause=None, evidence_ids=[])
+    diagnosis_data["support_assessment"] = {"evidence_links": [], "blocking_gaps": ["No mechanism has been established."]}
     provider["payload"]["choices"][0]["message"]["content"] = json.dumps(diagnosis_data)
 
     assert cli.main(["diagnose", str(incident_file)]) == 0

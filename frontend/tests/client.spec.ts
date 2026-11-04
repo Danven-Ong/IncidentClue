@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test';
 import { execFileSync } from 'node:child_process';
 import { resolve } from 'node:path';
-import { id, inspection, retrievalInspection } from '../src/testFixture';
+import { id, inspection, retrievalInspection, supportInspection } from '../src/testFixture';
 
 test('direct form, guarded synthetic data, local validation and narrow layout', async ({ page }) => {
   if (process.env.INCIDENTCLUE_FORM_SCREENSHOT) {
@@ -57,6 +57,23 @@ test('saved runbook citations focus exact excerpts and remain readable on narrow
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
     if (process.env.INCIDENTCLUE_RAG_SCREENSHOT_DIR)
       await page.screenshot({ path: resolve(process.env.INCIDENTCLUE_RAG_SCREENSHOT_DIR, `runbooks-${width}.png`), fullPage: true });
+  }
+});
+
+test('support explanations retain full evidence context on wide and narrow screens', async ({ page }) => {
+  await page.route('**/api/investigations/**', route => route.fulfill({ json: supportInspection() }));
+  await page.goto('/#/investigations/' + id);
+  const support = page.locator('.support-assessment');
+  await expect(support.getByRole('heading', { name: 'Evidence support' })).toBeVisible();
+  await support.getByText('Full observation E1').click();
+  await expect(support.getByText(/Request mapping is unknown. <script>/)).toBeVisible();
+  expect(await page.evaluate(() => 'bad' in window)).toBe(false);
+  for (const width of [1280, 375]) {
+    await page.setViewportSize({ width, height: 900 });
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+    await expect(support.getByText('The affected worker and request mapping is unknown.')).toBeVisible();
+    if (process.env.INCIDENTCLUE_SUPPORT_SCREENSHOT_DIR)
+      await page.screenshot({ path: resolve(process.env.INCIDENTCLUE_SUPPORT_SCREENSHOT_DIR, `support-${width}.png`), fullPage: true });
   }
 });
 

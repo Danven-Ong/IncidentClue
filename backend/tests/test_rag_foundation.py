@@ -101,7 +101,7 @@ def test_actual_sdk_option_copies_preserve_request_and_usage_capture(tmp_path, m
         content = "No lookup requested."
         if "response_format" in body:
             content = json.dumps({"status": "insufficient_evidence", "probable_cause": None,
-                "evidence_ids": [], "missing_evidence": ["More observations"], "next_checks": []})
+                "evidence_ids": [], "source_ids": [], "support_assessment": {"evidence_links": [], "blocking_gaps": ["Additional observations are required; scripted response."]}, "missing_evidence": ["More observations"], "next_checks": []})
         return httpx2.Response(200, json={"id": "mock", "object": "chat.completion", "created": 1,
             "model": "test-model", "choices": [{"index": 0, "finish_reason": "stop",
                 "message": {"role": "assistant", "content": content}}],
@@ -196,7 +196,7 @@ def test_failed_final_attempt_is_recorded_without_response_or_usage(tmp_path, mo
         diagnostic = failed["rejected_generation"]
         assert diagnostic["known_field_types"] == {"status": "string"}
         assert diagnostic["unknown_field_count"] == 1
-        assert diagnostic["diagnosis_contract_valid"] is False
+        assert diagnostic["legacy_diagnosis_contract_valid"] is False
         assert diagnostic["truncation"] == "unknown"
     assert private not in text
 
@@ -206,8 +206,8 @@ def test_failed_final_attempt_is_recorded_without_response_or_usage(tmp_path, mo
     ({"private": "private"}, {"availability": "not_text"}),
     ('{"private":', {"json_status": "invalid"}),
     ('{"private": NaN}', {"json_status": "invalid"}),
-    ('["private"]', {"json_status": "valid", "top_level_type": "array", "diagnosis_contract_valid": False}),
-    ('"private"', {"json_status": "valid", "top_level_type": "string", "diagnosis_contract_valid": False}),
+    ('["private"]', {"json_status": "valid", "top_level_type": "array", "legacy_diagnosis_contract_valid": False}),
+    ('"private"', {"json_status": "valid", "top_level_type": "string", "legacy_diagnosis_contract_valid": False}),
     ("private" * 3000, {"json_status": "not_inspected_size_limit"}),
 ])
 def test_rejected_generation_inspection_is_bounded_and_excludes_private_values(generation, expected):
@@ -237,10 +237,41 @@ def test_rejected_generation_contract_check_does_not_assert_cause_or_support(dia
     error = BadRequestError("private", response=response,
                             body={"error": {"failed_generation": json.dumps(diagnosis_data)}})
     diagnostic = suite.rejected_generation_details(error, diagnosis=True)
-    assert diagnostic["diagnosis_contract_valid"] is True
+    assert diagnostic["legacy_diagnosis_contract_valid"] is True
+    assert diagnostic["generation_diagnosis_contract_valid"] is True
     assert diagnostic["known_field_types"]["evidence_ids"] == "array"
     assert diagnostic["truncation"] == "unknown"
     assert diagnosis_data["probable_cause"] not in json.dumps(diagnostic)
+
+
+def test_rejected_generation_distinguishes_legacy_from_required_generation_fields(diagnosis_data):
+    diagnosis_data.pop("source_ids")
+    response = httpx2.Response(400, request=httpx2.Request("POST", "https://invalid.example"))
+    error = BadRequestError("private", response=response,
+                            body={"error": {"failed_generation": json.dumps(diagnosis_data)}})
+    diagnostic = suite.rejected_generation_details(error, diagnosis=True)
+    assert diagnostic["legacy_diagnosis_contract_valid"] is True
+    assert diagnostic["generation_diagnosis_contract_valid"] is False
+    assert "diagnosis_contract_valid" not in diagnostic
+    assert diagnostic["truncation"] == "unknown"
+    assert "source_ids" not in diagnosis_data
+
+
+@pytest.mark.parametrize("content,expected", [("valid", True), ("missing_sources", False),
+                                              ("invalid_json", False), (None, None)])
+def test_recorded_contract_uses_original_content_not_defaulted_saved_result(diagnosis_data, content, expected):
+    saved = dict(diagnosis_data)
+    if content == "missing_sources":
+        diagnosis_data.pop("source_ids")
+    original = "{" if content == "invalid_json" else json.dumps(diagnosis_data)
+    record = {"diagnosis": saved, "attempts": [{"phase": "diagnosis",
+              "status": "response_received", "response_index": 0, "attempt": 1}],
+              "requests": [{"response_format": {"json_schema": {"schema": suite.GenerationDiagnosis.model_json_schema()}}}],
+              "responses": [[{"message": {"content": original if content else None}}]]}
+    assert suite.recorded_generation_contract_valid(record) is expected
+    assert record["diagnosis"] == saved
+    record["attempts"][0]["status"] = "exception"
+    assert suite.recorded_generation_contract_valid(record) is None
 
 
 def test_recording_client_reraises_same_error_and_ignores_error_keywords():
@@ -268,7 +299,7 @@ def test_selection_generation_shape_keeps_only_fixed_names():
     diagnostic = suite.rejected_generation_details(error, diagnosis=False)
     assert diagnostic["known_field_types"] == {"name": "string", "arguments": "object"}
     assert diagnostic["unknown_field_count"] == 1
-    assert "diagnosis_contract_valid" not in diagnostic
+    assert "legacy_diagnosis_contract_valid" not in diagnostic
     assert "private" not in json.dumps(diagnostic)
 
 

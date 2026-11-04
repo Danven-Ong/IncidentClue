@@ -10,10 +10,10 @@ from types import SimpleNamespace
 from openai import APIStatusError
 from pydantic import ValidationError
 from incidentclue.investigation import investigate_incident
-from incidentclue.diagnosis import DiagnosisError
+from incidentclue.diagnosis import DiagnosisError, validate_support_excerpts
 from incidentclue.lifecycle import runtime_fingerprint
 from incidentclue.llm import DEFAULT_MODEL, create_groq_client
-from incidentclue.schemas import Diagnosis, Incident
+from incidentclue.schemas import Diagnosis, GenerationDiagnosis, Incident
 from incidentclue.tools import HealthSnapshot, LogSnapshot
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -132,7 +132,8 @@ def fake_client():
             content = "No further lookup requested."
             if "response_format" in request:
                 content = json.dumps({"status": "insufficient_evidence", "probable_cause": None,
-                    "evidence_ids": [], "missing_evidence": ["Harness smoke; no quality judgment."],
+                    "evidence_ids": [], "source_ids": [], "missing_evidence": ["Harness smoke; no quality judgment."],
+                    "support_assessment": {"evidence_links": [], "blocking_gaps": ["Additional observations are required; scripted response."]},
                     "next_checks": []})
             return SimpleNamespace(choices=[SimpleNamespace(finish_reason="stop",
                 message=ChatCompletionMessage(role="assistant", content=content))])
@@ -208,11 +209,73 @@ def rejected_generation_details(error, *, diagnosis):
         result["known_field_types"] = {name: shape(parsed[name]) for name in fields if name in parsed}
         result["unknown_field_count"] = sum(name not in fields for name in parsed)
     if diagnosis:
-        try:
-            Diagnosis.model_validate_json(content)
-            result["diagnosis_contract_valid"] = True
-        except ValidationError:
-            result["diagnosis_contract_valid"] = False
+        result["generation_contract_version"] = 2
+        for name, contract in (("legacy_diagnosis_contract_valid", Diagnosis),
+                               ("generation_diagnosis_contract_valid", GenerationDiagnosis)):
+            try:
+                contract.model_validate_json(content)
+                result[name] = True
+            except ValidationError:
+                result[name] = False
+    return result
+
+
+def recorded_generation_contract_valid(record):
+    """Check original returned diagnosis content, never a defaulted saved result.
+
+    None means no uniquely identified current-contract generation is available. Provider
+    exceptions remain execution failures regardless of rejected-content metadata.
+    """
+    attempts = [a for a in record.get("attempts", [])
+                if a.get("phase") == "diagnosis" and a.get("status") == "response_received"]
+    if len(attempts) != 1:
+        return None
+    index = attempts[0].get("response_index")
+    attempt_number = attempts[0].get("attempt")
+    if type(attempt_number) is not int:
+        return None
+    request_index = attempt_number - 1
+    requests = record.get("requests", [])
+    if not 0 <= request_index < len(requests):
+        return None
+    required = requests[request_index].get("response_format", {}).get("json_schema", {}).get("schema", {}).get("required", [])
+    if "support_assessment" not in required:
+        return None  # An older request did not ask for the current support contract.
+    responses = record.get("responses", [])
+    if type(index) is not int or not 0 <= index < len(responses):
+        return None
+    choices = responses[index]
+    if not isinstance(choices, list) or len(choices) != 1 or not isinstance(choices[0], dict):
+        return None
+    message = choices[0].get("message")
+    content = message.get("content") if isinstance(message, dict) else None
+    if not isinstance(content, str):
+        return None
+    try:
+        GenerationDiagnosis.model_validate_json(content)
+    except ValidationError:
+        return False
+    return True
+
+
+def saved_support_checks(incident, saved):
+    """Separate declared consistency and exact-quote provenance from semantic truth."""
+    result = {"support_record_available": saved.get("support_assessment") is not None,
+              "support_internal_consistency_valid": None,
+              "support_excerpt_membership_valid": None, "semantic_support_verified": None}
+    if not result["support_record_available"]:
+        return result
+    try:
+        diagnosis = Diagnosis.model_validate(saved)
+        GenerationDiagnosis.model_validate(diagnosis.model_dump())
+        result["support_internal_consistency_valid"] = True
+    except ValidationError:
+        return {**result, "support_internal_consistency_valid": False}
+    try:
+        validate_support_excerpts(incident, diagnosis)
+        result["support_excerpt_membership_valid"] = True
+    except ValueError:
+        result["support_excerpt_membership_valid"] = False
     return result
 
 

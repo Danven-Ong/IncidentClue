@@ -1,0 +1,26 @@
+{
+  "schema_version": 3,
+  "split": "development",
+  "source_commit": "41a8294efb8d3656ee5b0424ca50b84599bb3d4b",
+  "cases": 12,
+  "cutoffs": [0.25, 0.30],
+  "representation": "Existing v2 title-newline-passage embeddings; no new embedding inputs",
+  "candidate": "Rank eligible current runbooks by their closest passage distance, ties by that passage ID under C collation. Select documents whose closest passage is within cutoff. Expand each selected document to mechanism then checks, retaining exact original excerpts and actual sibling distances. Apply existing top3/3000 excerpt bytes/4000 serialized bytes bounds. A sibling may exceed the seed cutoff; disclose seed ID/distance separately. No labels in retrieval.",
+  "control": "Replay title-context section retrieval at both cutoffs and original body-corpus lexical OR. Verify archived v2 raw SHA256, then exact query/input/source IDs/ranks/metadata and distance tolerance 0.000001. Stop on mismatch.",
+  "maximum_retrieval_operations": 60,
+  "candidate_operations": 24,
+  "control_operations": 36,
+  "maximum_passage_vectors": 72,
+  "maximum_query_vectors": 12,
+  "selection": {
+    "answerable_hits": "at least 5/6",
+    "no_guidance_false_matches": "0/2",
+    "scope_version_violations": 0,
+    "minimum_mrr": "unchanged lexical OR mean over ten nonempty relevance sets",
+    "tie_break": ["highest_ndcg", "highest_precision_at_3", "lowest_cutoff"],
+    "no_eligible_candidate": "null; do not relax gates"
+  },
+  "stop": "One measured development comparison only. Preserve failure/partial reports. No extra cutoff, candidate or metric substitution after inspecting results.",
+  "promotion": "None automatically, even on development success. Runtime and its artifact acceptance remain unchanged.",
+  "exclusions": ["No held-out inspection/scoring", "No live LLM/judge calls", "No downloads", "No runtime/corpus/label/rubric changes", "No Linux probe", "No application services/volumes", "No push/merge/deployment"]
+}

@@ -1,0 +1,62 @@
+{
+  "schema_version": 2,
+  "purpose": "Diagnostic paired live evaluation, not held-out confirmation or release acceptance",
+  "case_ids": [
+    "case-08",
+    "case-10",
+    "case-11",
+    "case-12"
+  ],
+  "split": "development",
+  "model": "openai/gpt-oss-20b",
+  "arms": [
+    "no_rag",
+    "rag"
+  ],
+  "order": "Alternate no_rag/rag and rag/no_rag by case index; sequential execution, no statistical claim",
+  "maximum_investigations": 8,
+  "maximum_model_requests": 24,
+  "maximum_tool_attempts": 16,
+  "per_investigation_model_requests": 3,
+  "per_investigation_tool_attempts": 2,
+  "maximum_rag_lookups_per_investigation": 1,
+  "maximum_completion_tokens": 16384,
+  "completion_token_note": "Eight investigations, each at most two 512-token selections plus one 1024-token diagnosis: 16384 reserved completion tokens. Input tokens not fixed; missing usage remains unknown.",
+  "request_timeout_seconds": 20,
+  "batch_start_deadline_seconds": 2400,
+  "stop": "Stop batch at first provider/contract/retrieval/budget failure, rate limit, or deadline; no retries, repair calls, reruns, fallback models, or automatic continuation. Deadline checked before actions; an in-flight call can take its configured timeout beyond deadline. Preserve partial report and remaining run IDs.",
+  "candidate": "Frozen v3 title-context nearest-passage document selection at0.30; exact Mechanism/Checks expansion under existing bounds. Failed held-out confirmation retained; experiment only.",
+  "integration": "Real shared LangGraph build_investigation_graph, initial state, tools, prompts, strict diagnosis validation. Evaluator supplies experimental RetrievalPin and lookup callback; normal pin_corpus acceptance/default app runtime is unchanged. Ephemeral in-memory graph, not durable resume validation.",
+  "fairness": "Same model/options/input/available snapshots/budgets per pair. Do not preload or force runbook calls. Compare final observation sets; flag evidence differences because retrieval competes with health/log tools.",
+  "quality_review": "Auto-check structure, evidence/source membership and budgets; matched expected status alone is not semantic correctness. Generate manual claim-by-claim observation support, document support, useful-check, abstention and pair-regression worksheet. Reviewer identity required. Overall quality remains unassessed until semantic review; assistant review is not independent human review.",
+  "live_authorization": "Requires separate bounded user approval after offline harness verification, --live and --approve-protocol matching the exact protocol SHA256. No credentials read/client constructed in fake mode.",
+  "limits": [
+    "No production runtime promotion",
+    "No model/prompt tuning",
+    "No downloads",
+    "No held-out retuning",
+    "No application services or volumes",
+    "No commit before agreed acceptance and user review",
+    "No push/merge/deployment"
+  ],
+  "pacing": {
+    "wait_before_every_request_seconds": 65,
+    "sleep_chunk_seconds": 5,
+    "initial_cooldown": true,
+    "fake_mode_waits": false,
+    "quota_verified": false,
+    "note": "Conservative fixed spacing, not an account-quota guarantee. No other organization traffic is controlled. Does not resolve daily exhaustion. Waiting counts against batch deadline; no request starts at or after deadline.",
+    "published_reference": {
+      "url": "https://console.groq.com/docs/rate-limits",
+      "checked_date": "2026-11-04",
+      "model": "openai/gpt-oss-20b",
+      "requests_per_minute": 30,
+      "tokens_per_minute": 8000,
+      "requests_per_day": 1000,
+      "tokens_per_day": 200000,
+      "account_specific_limits_verified": false,
+      "note": "Public table, not verified account allowance; organization-wide traffic and daily balance unknown."
+    }
+  },
+  "prior_run": "Separate batch on four previously unattempted development cases only. Preserve v1 rate-limited trace; do not retry case02 or rerun case01."
+}

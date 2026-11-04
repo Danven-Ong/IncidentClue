@@ -37,6 +37,11 @@ def diagnosis_data() -> dict[str, Any]:
         "status": "hypothesis",
         "probable_cause": "Checkout cannot start because PAYMENT_API_URL is missing.",
         "evidence_ids": ["E2"],
+        "source_ids": [],
+        "support_assessment": {"evidence_links": [{"evidence_id": "E2",
+            "excerpt": "required environment variable PAYMENT_API_URL is missing.",
+            "relation": "The observation directly records the missing required setting."}],
+            "blocking_gaps": []},
         "missing_evidence": ["Effective deployment configuration."],
         "next_checks": ["Inspect environment variables in the deployment."],
     }

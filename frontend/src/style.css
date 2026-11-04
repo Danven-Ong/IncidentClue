@@ -13,6 +13,12 @@
   --warning:#e5c784;
   --error:#f0aaa6
 }
+.support-assessment { margin-top:24px }
+.support-assessment > .hint { margin-bottom:16px }
+.support-link { padding:16px 0; border-top:1px solid var(--line) }
+.support-link blockquote { margin:8px 0; padding:0; color:var(--accent); overflow-wrap:anywhere }
+.support-link details { margin-top:8px }
+.support-assessment > h3:not(:first-child) { margin-top:20px }
 * {
   box-sizing:border-box
 }

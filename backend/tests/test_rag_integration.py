@@ -42,6 +42,9 @@ def tool(name="get_runbook_context", service="billing", identifier="lookup-1"):
 def answer(source_ids=(), status="hypothesis", evidence_ids=("E1",)):
     return {"status":status,"probable_cause":"Observed resolution failure before connection." if status == "hypothesis" else None,
             "evidence_ids":list(evidence_ids),"source_ids":list(source_ids),
+            "support_assessment":{"evidence_links":[{"evidence_id":e,
+                "excerpt":"Resolver returned NXDOMAIN", "relation":"Records the observed resolution failure."}
+                for e in evidence_ids], "blocking_gaps":[] if status=="hypothesis" else ["Mechanism is unconfirmed in this scripted response."]},
             "missing_evidence":["Effective resolver configuration"],"next_checks":["Inspect resolver records"]}
 
 
@@ -153,9 +156,29 @@ def test_legacy_saved_diagnosis_and_new_generation_contract(context):
     incident,_,_=context
     data=answer()
     data.pop("source_ids")
+    data.pop("support_assessment")
     assert Diagnosis.model_validate(data).source_ids==[]
-    assert _validate_diagnosis(incident,json.dumps(data)).source_ids==[]
+    assert Diagnosis.model_validate(data).support_assessment is None
+    from incidentclue.persistence import restore_update
+    assert restore_update({"diagnosis": data})["diagnosis"].source_ids == []
+    with pytest.raises(DiagnosisError):
+        _validate_diagnosis(incident,json.dumps(data))
     assert "source_ids" in GenerationDiagnosis.model_json_schema()["required"]
+
+
+@pytest.mark.parametrize("rag", [False, True])
+@pytest.mark.parametrize("status", ["hypothesis", "insufficient_evidence"])
+def test_generation_requires_sources_in_both_arms_and_keeps_saved_type(context, rag, status):
+    from incidentclue.persistence import restore_update
+    incident, pin, source = context
+    data = answer([source["id"]] if rag else [], status=status)
+    options = {"pin": pin, "sources": [source]} if rag else {}
+    result = _validate_diagnosis(incident, json.dumps(data), **options)
+    assert type(result) is Diagnosis
+    assert restore_update({"diagnosis": result.model_dump()})["diagnosis"] == result
+    data.pop("source_ids")
+    with pytest.raises(DiagnosisError, match="diagnosis contract"):
+        _validate_diagnosis(incident, json.dumps(data), **options)
 
 
 def test_fingerprint_covers_nested_rag_code(context,tmp_path,monkeypatch):

@@ -38,6 +38,35 @@ export function RunbookSources({ state }: { state: JsonObject }) {
     })}</div>
   </section>;
 }
+export function DiagnosisSupport({ state }: { state: JsonObject }) {
+  const support = isObject(state.diagnosis) ? state.diagnosis.support_assessment : null;
+  if (support == null) return <section className="support-assessment"><h3>Evidence support</h3>
+    <p className="muted">No support explanation was saved for this result.</p></section>;
+  if (!isObject(support) || !strings(support.blocking_gaps) || !Array.isArray(support.evidence_links)
+    || !support.evidence_links.every(link => isObject(link) && typeof link.evidence_id === 'string'
+      && typeof link.excerpt === 'string' && typeof link.relation === 'string'))
+    return <section className="support-assessment"><h3>Evidence support</h3>
+      <p className="muted">Saved support format is not recognised.</p><JsonDetails label="Support details" value={support} /></section>;
+  const evidence = Array.isArray(state.evidence) ? state.evidence.filter(isObject) : [];
+  return <section className="support-assessment"><h3>Evidence support</h3>
+    <p className="hint">Model explanations for review. Exact excerpts do not confirm causation.</p>
+    {support.evidence_links.map((link, i) => {
+      const observation = evidence.find(e => e.id === link.evidence_id);
+      return <div className="support-link" key={i}>
+        <p>Excerpt from <code>{link.evidence_id}</code></p>
+        <blockquote className="preserve">{link.excerpt}</blockquote>
+        <p className="preserve">{link.relation}</p>
+        {observation ? <details><summary>Full observation {link.evidence_id}</summary>
+          <p className="preserve">{text(observation.content)}</p></details>
+          : <p className="muted">The cited observation is unavailable.</p>}
+      </div>;
+    })}
+    <h3>Reported blocking gaps</h3>
+    {support.blocking_gaps.length ? <ul>{support.blocking_gaps.map((gap, i) => <li key={i}>{gap}</li>)}</ul>
+      : <p className="muted">No blocking gaps reported by the model.</p>}
+  </section>;
+}
+
 function Diagnosis({ state }: { state: JsonObject }) {
   const d = state.diagnosis;
   if (!isObject(d)) return <p className="muted">No validated diagnosis saved.</p>;
@@ -72,6 +101,7 @@ function Diagnosis({ state }: { state: JsonObject }) {
       <section><h3>Suggested next checks</h3>{(d.next_checks as string[]).length
         ? <ul>{(d.next_checks as string[]).map((s, i) => <li key={i}>{s}</li>)}</ul> : <p className="muted">None recorded.</p>}
         <p className="hint">Suggestions only. No remediation is executed.</p></section></div>
+    <DiagnosisSupport state={state} />
   </>;
 }
 

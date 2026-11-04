@@ -52,7 +52,7 @@ def selection():
 def final():
     return completion({"content": json.dumps({
         "status": "hypothesis", "probable_cause": "Missing PAYMENT_API_URL.",
-        "evidence_ids": ["H1"], "missing_evidence": ["Deployment configuration."],
+        "evidence_ids": ["H1"], "support_assessment": {"evidence_links": [{"evidence_id": "H1", "excerpt": "required configuration PAYMENT_API_URL is missing.", "relation": "The health observation records the missing required setting."}], "blocking_gaps": []}, "source_ids": [], "missing_evidence": ["Deployment configuration."],
         "next_checks": ["Inspect recorded runtime configuration."],
     })})
 
@@ -118,7 +118,7 @@ def test_malformed_selection_cli_still_writes_failure_record(tmp_path, incident,
 def abstention():
     return completion({"content": json.dumps({
         "status": "insufficient_evidence", "probable_cause": None,
-        "evidence_ids": [], "missing_evidence": ["Health observations."],
+        "evidence_ids": [], "source_ids": [], "support_assessment": {"evidence_links": [], "blocking_gaps": ["Additional observations are required; scripted response."]}, "missing_evidence": ["Health observations."],
         "next_checks": ["Collect health observations."],
     })})
 
@@ -432,6 +432,7 @@ def log_final(final):
     final = deepcopy(final)
     payload = json.loads(final["choices"][0]["message"]["content"])
     payload["evidence_ids"] = ["L2"]
+    payload["support_assessment"]["evidence_links"][0].update(evidence_id="L2", excerpt="PAYMENT_API_URL")
     final["choices"][0]["message"]["content"] = json.dumps(payload)
     return final
 
@@ -464,6 +465,7 @@ def test_unconfigured_log_tool_rejected(incident, health, log_selection):
 def test_cannot_cite_logs_outside_returned_window(incident, health, logs, log_selection, log_final):
     payload = json.loads(log_final["choices"][0]["message"]["content"])
     payload["evidence_ids"] = ["L0"]
+    payload["support_assessment"]["evidence_links"][0]["evidence_id"] = "L0"
     log_final["choices"][0]["message"]["content"] = json.dumps(payload)
     with fake_client([log_selection, completion({"content": "Enough evidence."}), log_final], []) as client, pytest.raises(DiagnosisError, match="outside"):
         investigation.investigate_incident(incident, client, health, logs=logs)
@@ -610,6 +612,7 @@ def test_same_call_id_cannot_be_reused(incident, health, selection):
 def test_final_invalid_citation_fails_in_validate_node(incident, health, selection, final):
     payload = json.loads(final["choices"][0]["message"]["content"])
     payload["evidence_ids"] = ["invented"]
+    payload["support_assessment"]["evidence_links"][0]["evidence_id"] = "invented"
     final["choices"][0]["message"]["content"] = json.dumps(payload)
     steps = []
     with fake_client([selection, completion({"content": "Enough."}), final], []) as client, pytest.raises(DiagnosisError, match="outside"):

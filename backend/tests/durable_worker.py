@@ -40,7 +40,7 @@ def provider():
         if "response_format" in body:
             message = {"content": json.dumps({
                 "status": "hypothesis", "probable_cause": "Missing PAYMENT_API_URL.",
-                "evidence_ids": ["H1"], "missing_evidence": ["Deployment configuration."],
+                "evidence_ids": ["H1"], "source_ids": [], "support_assessment": {"evidence_links": [{"evidence_id": "H1", "excerpt": "required configuration PAYMENT_API_URL is missing.", "relation": "The health observation records the missing required setting."}], "blocking_gaps": []}, "missing_evidence": ["Deployment configuration."],
                 "next_checks": ["Inspect recorded runtime configuration."],
             })}
             reply = completion(message)

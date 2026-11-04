@@ -24,3 +24,15 @@ export function retrievalInspection() {
       missing_evidence: ['Request mapping for the affected workers.'], next_checks: ['Read traces to establish request correlation.'] },
   } });
 }
+
+export function supportInspection() {
+  const value = retrievalInspection();
+  const content = 'NXDOMAIN returned before any connection attempt. Request mapping is unknown. <script>window.bad=true</script>';
+  value.state.evidence = [{ id: 'E1', kind: 'log', timestamp: '2026-11-01T00:00:00Z', content }];
+  value.state.diagnosis = { status: 'insufficient_evidence', probable_cause: null, evidence_ids: ['E1'], source_ids: [],
+    missing_evidence: ['Request mapping for the affected workers.'], next_checks: ['Read traces to establish request correlation.'],
+    support_assessment: { evidence_links: [{ evidence_id: 'E1', excerpt: 'NXDOMAIN returned before any connection attempt.',
+      relation: 'Records a lookup failure; it does not establish which requests were affected.' }],
+      blocking_gaps: ['The affected worker and request mapping is unknown.'] } };
+  return value;
+}

@@ -1,5 +1,231 @@
 # Retrieval contract (implementation in progress)
 
+## Inspectable diagnosis support
+
+New generations now require `support_assessment` in the same diagnosis request:
+`evidence_links` contain an incident `evidence_id`, exact `excerpt` and a short
+model-written `relation`; `blocking_gaps` lists acknowledged facts missing from
+the incident-level conclusion. Hypotheses need support links covering every
+evidence citation and no declared blocking gaps. Abstention needs at least one
+blocking gap. An unknown deeper origin need not block a directly observed mechanism.
+
+Reject foreign IDs, nonmatching/blank excerpts, duplicate links, missing fields
+and internal inconsistencies without repairing or rewriting the answer. Each
+list is capped at three entries, excerpts/relations/gaps at240characters, and
+the serialized support object at2,000UTF-8bytes. Existing request/tool/input/token
+limits stay unchanged; the extra output can increase generation pressure within
+the existing1,024-token diagnosis cap. Provider compatibility and semantic behavior
+of this new format have not been live-evaluated.
+
+Support is saved inside Diagnosis and exposed through CLI/API inspection. Browser
+inspection shows model explanations, reported gaps and expandable full original
+observations; content is rendered as text. Legacy results with no support load as
+`null`/unavailable, never reconstructed or treated as verified. The existing
+checkpoint class allowlist is unchanged; unfinished old runs remain subject to
+source-fingerprint incompatibility and are not reset or migrated.
+
+These checks establish quote provenance and declared consistency, **not causal
+truth**. A model can quote case08 exactly and still give a false interpretation.
+That counterexample is explicitly covered by offline tests. No semantic fix,
+RAG benefit, new model request, judge layer or human approval workflow is claimed.
+Earlier raw results and failures remain unchanged. The previous live protocol
+now refuses changed runtime/helper hashes; its consumed approval cannot authorize
+the new support format. Any later live evaluation needs a separately frozen scope.
+
+## Current verdict and investigator regression
+
+The retained paired diagnostic attempted all 12 distinct arms of six selected
+development cases across three separately approved batches: nine accepted
+outputs and three execution failures. Accepted output is not correctness.
+Both case08 arms made unsupported causal claims; both case10 arms were rejected
+by the provider. Cases11/12 behaved appropriately with no guidance returned.
+RAG benefit remains unproven and held-out retrieval confirmation remains failed.
+See the [qualified results summary](../evals/rag/README.md#retained-diagnostic-results).
+
+After those runs, new-response validation was corrected to require source_ids
+in both arms while retaining legacy saved-result compatibility. Diagnosis
+instructions were subsequently revised to choose a bounded observed mechanism,
+check its connection to the affected operation and abstain on unresolved causal
+links. This instruction candidate is shared by direct and graph diagnosis.
+It preserves supported hypotheses when a deeper origin is unknown; it adds no
+judge, case-specific filter, repair, retry or extra model request.
+
+The original paired answers predate the revision and retain their original
+verdicts. A separately approved [no-RAG regression protocol](../evals/rag/investigator-regression-protocol.v1.json)
+then ran five inspected development cases with the revised instructions. All five
+produced accepted outputs; assistant semantic review found four appropriate
+bounded outcomes and one failure. Case08 again asserted an unsupported cause
+instead of abstaining, despite verified delivery of the revised prompt. The
+instruction rewrite therefore did not resolve the central reasoning defect.
+
+The regression used 15 model requests, five tool attempts and no retries. It
+does not measure RAG benefit or generalization, and its successful case10 output
+does not erase the original provider rejections. Keep this regression separate
+from the original 12-arm paired diagnostic. Model, retrieval and execution caps
+remain unchanged. No further batch or inspected held-out tuning is authorized
+by this document. Full evidence remains outside application Git in the mentoring
+records as investigator-regression-live-20261104-a.jsonl and its automatic and
+assistant semantic reviews.
+
+## Experimental paired diagnosis evaluation
+
+An evaluator-only [paired protocol](../evals/rag/paired-protocol.v1.json) and
+[harness](../evals/rag/paired.py) compare six development incidents with and
+without runbooks through the existing investigation graph. This is a diagnostic
+experiment following failed retrieval confirmation, not runtime promotion or a
+new held-out benchmark. The evaluator supplies the frozen experimental lookup
+through existing graph hooks; production corpus acceptance stays unchanged.
+
+Each arm has the same model, input snapshots and three-model/two-tool limits.
+Runbook lookup competes with evidence tools and is never forced. Reports retain
+requests/responses, charged failures, actual observation sets, exact sources,
+available usage and timings. Pair review flags differences in fetched observations
+rather than assuming both arms saw the same final evidence. A generated worksheet
+requires claim-by-claim observation support and separate document support; citation
+membership and expected status alone do not establish correctness.
+
+Default execution uses a scripted provider, which measures integration only.
+Live generation needs separate bounded approval of the exact protocol and an
+explicit live flag. One batch is capped at twelve investigations, 36 model calls,
+24 tool attempts and 24,576 reserved completion tokens, with no retries and stop
+on the first execution error. Normal application behavior, saved investigations
+and the failed confirmation result are unchanged. Semantic quality is unassessed
+until actual live outputs are reviewed; assistant review is not independent human
+review. See [evaluation usage](../evals/rag/README.md#paired-diagnostic-evaluation).
+
+## Held-out confirmation failed
+
+On 4 November 2026, a separately frozen protocol tested the selected 0.30 policy
+once on all 12 held-out cases, after reproducing 24 archived development controls.
+It used unchanged v3 code, original corpus/labels/query policy, cached Windows CPU
+embeddings and isolated PostgreSQL. No tuning or extra cutoffs were tested.
+
+| Method | Answerable hits | No-guidance false matches | MRR@3 | Recall@3 |
+| --- | --- | --- | --- | --- |
+| Runbook expansion, 0.30 | 6/6 | 1/2 | 0.8333 | 0.85 |
+| Lexical OR | 6/6 | 2/2 | 0.85 | 0.70 |
+| Original lexical AND | 0/6 | 0/2 | 0.00 | 0.00 |
+
+**Confirmation failed:** the candidate must return no guidance in both
+no-guidance cases and have MRR at least lexical OR. Case23 received connectivity
+guidance despite its no-guidance label; case22 returned no labeled relevant
+guidance, and case15's first relevant passage ranked third. Scope/version
+violations were zero, but higher recall cannot substitute for the failed gates.
+
+The [frozen confirmation protocol](../evals/rag/confirmation-protocol.v1.json)
+and [retained held-out result](../evals/rag/confirmation-held-out.v1.json) pin the
+60-operation pass, source/runner/report hashes and full metrics. All 129 returned
+excerpts/metadata/scope/byte bounds were audited. These cases are now inspected:
+do not tune/relabel/retry them into a pass. Future tuning needs a fresh held-out
+set. Runtime promotion stopped; live generation was not run. The development
+success below remains a development result only. Original model limitations,
+strict unmet diagnosis-quality gate and separate bounded live approval remain.
+
+## Runbook expansion development result
+
+On 4 November 2026, one predeclared evaluator-only experiment selected documents
+by their nearest title-context passage and returned each document's original
+Mechanism and Checks sections. It retained the three-source/3,000 excerpt-byte/
+4,000 serialized-byte bounds, frozen labels and v2 lexical OR selection floor.
+
+| Candidate / cutoff | Answerable hits | No-guidance false matches | MRR@3 |
+| --- | --- | --- | --- |
+| Runbook expansion, 0.25 | 4/6 | 0/2 | 0.70 |
+| Runbook expansion, 0.30 | 6/6 | 0/2 | 0.9333 |
+| Replayed lexical OR | 6/6 | 2/2 | 0.6833 |
+
+The 0.30 candidate meets the unchanged **development** selection gates, with
+Recall@3 0.95 and zero scope/version violations. All 36 archived title-vector/OR
+controls reproduced. The complete pass executed 60 retrieval operations using
+two real 36-passage batches and 12 cached query vectors. Exact excerpts and source
+locations were audited; no generation, held-out scoring or downloads occurred.
+Protocol and results are in [v3 protocol](../evals/rag/runbook-protocol.v3.json)
+and [v3 development decision](../evals/rag/calibration-development.v3.json).
+
+The cutoff selects the **document**, not every returned sibling passage. Sources
+retain their own cosine distances, which may exceed the cutoff; document seed
+IDs/distances are recorded separately. Expansion orders Mechanism before Checks,
+so rank metrics reflect this new output policy as well as document matching.
+Some third slots contain competing guidance. This small, repeatedly inspected
+synthetic development result does not establish independent relevance, semantic
+support, tool choice, improved diagnoses or generalization. V1/v2 failures remain
+unchanged. No runtime policy was promoted; experimental title corpora remain
+unsupported by current runtime pinning. A separately frozen confirmation protocol
+is needed before any held-out assessment, and live evaluation still needs bounded
+approval. Linux/Python 3.13 verification remains explicitly deferred.
+
+## First offline development result
+
+On 2 November 2026, the cached real CPU model and isolated PG17/vector0.8.1
+database ran the current query policy against all 12 development cases. The
+corpus, labels, runtime policy and application configuration were unchanged;
+held-out inputs were not scored and no Groq calls were made.
+
+| Method / cutoff | Labeled answerable hits | No-guidance false matches | MRR@3 |
+| --- | --- | --- | --- |
+| Current full-text baseline | 0/6 | 0/2 | 0.00 |
+| Vector 0.25 | 4/6 | 0/2 | 0.55 |
+| Vector 0.35 | 5/6 | 1/2 | 0.60 |
+| Vector 0.40 | 5/6 | 2/2 | 0.60 |
+
+MRR is averaged over the 10 cases with nonempty relevance labels. All methods
+had zero service/superseded-version violations. Full results and the predeclared
+selection policy are in the evaluator-only
+[development calibration record](../evals/rag/calibration-development.v1.json).
+**No cutoff met the selection criteria; none is recommended or promoted.**
+
+The fifth labeled answerable hit needs distance about 0.346, while a no-guidance
+case already matches at about 0.290. With this ranking and these labels, a global
+distance cutoff alone cannot meet both targets. The existing lexical baseline
+uses English `plainto_tsquery` over the whole incident query, requiring all terms;
+it returned empty results on all 12 cases. That weak baseline does not establish
+general vector superiority. A later baseline/query change needs a separately
+versioned development comparison, rather than rewriting this result.
+
+There is also a possible annotation-granularity gap: case04 ranks
+`compatibility#symptoms` first, while frozen labels only credit that document's
+mechanism/checks. Case10 similarly ranks `evidence#symptoms` without its labeled
+guidance in the top three. Unlisted passages remain grade 0; these observations
+are not retrospective score corrections. Symptom similarity can also be useless
+or misleading, as the disk-full and unspecified-upload no-guidance cases show.
+
+These are inspected synthetic fixtures with assistant-curated labels. The pass
+evaluates initial-state retrieval only, with no model tool selection or diagnosis
+generation. It does not show improved judgment or satisfy the original strict
+unsupported-claim gate. Next review the lexical query and passage representation
+as versioned development changes; held-out and live evaluation remain separate.
+
+## Versioned representation comparison
+
+The second bounded development pass tested an OR lexical query and a title-prefix
+embedding representation. It reproduced all 156 prior control searches, then
+compared the candidates under the same frozen annotations and cutoff grid.
+
+| Candidate | Labeled answerable hits | No-guidance false matches | MRR@3 |
+| --- | --- | --- | --- |
+| Lexical OR | 6/6 | 2/2 | 0.6833 |
+| Title-prefixed vectors, 0.30 | 5/6 | 0/2 | 0.60 |
+| Title-prefixed vectors, 0.35 | 6/6 | 1/2 | 0.65 |
+
+Title context improves the schema-mismatch guidance ranking and moves pool checks
+to first place, but also moves the dependency-latency mechanism below a symptom
+passage. Lexical OR is a more useful comparator than the original empty-result AND
+baseline, while still returning unrelated guidance for no-guidance inputs.
+Vector MRR remains below the OR baseline; neither candidate meets all criteria.
+**Selection remains null and runtime behavior is unchanged.** Improved recall or
+nDCG does not retrospectively satisfy the failed MRR/no-guidance gates.
+
+The evaluator-only [v2 protocol](../evals/rag/representation-protocol.v2.json) and
+[v2 decision](../evals/rag/calibration-development.v2.json) preserve the fixed
+312-search budget, two real passage batches, 12 query embeddings and full results.
+No labels, corpus excerpts, generation model, query policy or application config
+were changed; no external calls or held-out scoring occurred. Experimental corpus
+identities cannot be opted into the current runtime without a separate supported
+policy implementation. Avoid an automatic experiment loop: review ranking goals
+and annotation granularity before any further versioned retrieval change.
+
+## Implementation status
+
 Synthetic fixtures and the no-RAG evaluation runner are available. The optional
 `incidentclue.rag` module now implements corpus validation, local CPU embeddings,
 explicit schema setup, immutable ingestion, exact cosine lookup and a PostgreSQL

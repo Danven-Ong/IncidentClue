@@ -1,0 +1,81 @@
+{
+  "schema_version": 1,
+  "status": "failed_held_out_confirmation",
+  "source_commit": "a76e193d26d6f0f51f73e3b3c1a1d1f8a289b724",
+  "protocol_sha256": "9415dd25054a6d734938f5a11d33edfd56268812b2a1944647507c48809115f7",
+  "runner_sha256": "690a4976c66a82c139dfbb4ec3a2978f5feef3ad7508346077285a9482d26684",
+  "development_report_sha256": "df57ca2c506f6075a47e9506b76d6be1f30c81e5fb4d08687d1381fed135e03f",
+  "fixture_sha256": "e25ab7f40b4afa21f6ecf648982df1474bad2c741c83456cd42b9f872905a6b7",
+  "raw_report_name": "rag-confirmation-held-out-20261104-a.jsonl",
+  "raw_report_sha256": "057a9f8387bfe36b014e29203bafa8455297edad899fec6556122264acfb1794",
+  "exact_sources_audited": 129,
+  "failed_gates": [
+    "no_guidance_false_positives:1 exceeds0",
+    "MRR:0.8333333333333334 below lexicalOR0.85"
+  ],
+  "summary": {
+    "type": "summary",
+    "split": "held_out",
+    "fixed_cutoff": 0.3,
+    "metrics": {
+      "runbook": {
+        "planned": 12,
+        "assessed": 12,
+        "nonempty_relevance_cases": 10,
+        "recall_at_3": 0.85,
+        "mrr_at_3": 0.8333333333333334,
+        "ndcg_at_3": 0.830657359638273,
+        "precision_at_3": 0.47222222222222215,
+        "hit_cases": 9,
+        "answerable_cases": 6,
+        "answerable_hits": 6,
+        "no_guidance_cases": 2,
+        "no_guidance_false_positives": 1,
+        "empty_results": 1,
+        "scope_version_violations": 0
+      },
+      "lexical_or": {
+        "planned": 12,
+        "assessed": 12,
+        "nonempty_relevance_cases": 10,
+        "recall_at_3": 0.7,
+        "mrr_at_3": 0.85,
+        "ndcg_at_3": 0.7146015174679105,
+        "precision_at_3": 0.38888888888888884,
+        "hit_cases": 9,
+        "answerable_cases": 6,
+        "answerable_hits": 6,
+        "no_guidance_cases": 2,
+        "no_guidance_false_positives": 2,
+        "empty_results": 0,
+        "scope_version_violations": 0
+      },
+      "lexical": {
+        "planned": 12,
+        "assessed": 12,
+        "nonempty_relevance_cases": 10,
+        "recall_at_3": 0.0,
+        "mrr_at_3": 0.0,
+        "ndcg_at_3": 0.0,
+        "precision_at_3": 0.0,
+        "hit_cases": 0,
+        "answerable_cases": 6,
+        "answerable_hits": 0,
+        "no_guidance_cases": 2,
+        "no_guidance_false_positives": 0,
+        "empty_results": 12,
+        "scope_version_violations": 0
+      }
+    },
+    "confirmation_pass": false,
+    "retrieval_operations": 60,
+    "development_control_matches": 24,
+    "held_out_cases_scored": 12,
+    "passage_vectors": 72,
+    "query_vectors": 24,
+    "provider_calls": 0,
+    "runtime_promoted": false,
+    "diagnosis_quality_assessed": false
+  },
+  "next_boundary": "No runtime promotion; no tuning/relabeling/retesting to pass this set; future tuning requires fresh held-out cases; live evaluation needs separate bounded approval"
+}

@@ -1,0 +1,78 @@
+{
+  "schema_version": 1,
+  "purpose": "One separately approved no-RAG development regression of revised diagnosis instructions; not a retry of an old batch, unseen benchmark, RAG comparison or release acceptance",
+  "case_ids": [
+    "case-01",
+    "case-08",
+    "case-10",
+    "case-11",
+    "case-12"
+  ],
+  "arms": [
+    "no_rag"
+  ],
+  "model": "openai/gpt-oss-20b",
+  "caps": {
+    "investigations": 5,
+    "models": 15,
+    "tools": 10,
+    "completion_tokens": 10240,
+    "deadline_seconds": 1500,
+    "request_timeout_seconds": 20,
+    "wait_seconds": 65
+  },
+  "per_investigation": {
+    "models": 3,
+    "tools": 2,
+    "selection_completion_tokens": 512,
+    "diagnosis_completion_tokens": 1024
+  },
+  "stop": "Stop first execution error including malformed diagnosis, provider rejection, rate limit, timeout, auth, input/budget/deadline, tool or unknown failure. Flush failure evidence; no retry, repair, fallback, continuation batch or tuning loop.",
+  "pacing": "Wait at least65s before every provider request including first, in chunks at most5s. Deadline covers entire batch; pacing gives no quota guarantee.",
+  "approval": "Separate user approval of this exact protocol SHA256 and --live --approve-protocol required. No credentials read in fake mode. No earlier protocol approval applies.",
+  "integration": "Existing real investigation graph with retrieval disabled; existing snapshot health/log tools only. No database, Docker, embeddings, model download, stored application data or model judge.",
+  "review": {
+    "execution": "All5 investigations must produce accepted diagnoses, with structure, citation membership and budgets checked separately from semantic correctness.",
+    "semantics": "Assistant claim-by-claim review, not independent human ground truth. Check every answer field, including implicit causal claims in suggested checks. Status match alone is insufficient.",
+    "positive_controls": {
+      "case-01": "Bounded missing required setting mechanism supported; no invented deeper origin.",
+      "case-11": "Bounded zero-free-bytes/ENOSPC mechanism supported; no invented reason for disk consumption."
+    },
+    "negative_controls": {
+      "case-08": "Abstain on unresolved worker/request mapping, request correlation checks; no common cause asserted.",
+      "case-10": "Abstain on deployment timing without error mechanism; no inferred deployment cause.",
+      "case-12": "Abstain on user reports alone; request missing diagnostic observations."
+    },
+    "limitations": "Inspected development regression only. No new generalization evidence, RAG-benefit measurement or retrospective pass for retained failures. Heldout retrieval remains failed."
+  },
+  "runner_sha256": "f22402b703a5a919ea52a7d69e21783290353a58e5ce46b7758f8b5c2bfbaa16",
+  "dependencies": {
+    "paired_remaining.py": "b5017fa9b2d0e2473d18818b36f5bf74446b0e04db9210cea4758c8f3a0c67dd",
+    "suite.py": "9a3e4bdb3fb5744ecbf1c88cf157452cbccc6fbdc5890fe8941414fc04fd98e8",
+    "runbook.py": "890c2210cd635866ee07203b5ea740e01850a2e2fd66b7fb1b98743c3ee3f98d",
+    "representation.py": "c68f043f1542ee11dfd95f52bc9102d92bc72f74d998e4cd4cb75a3de555ccc8",
+    "retrieval.py": "c9eacb6d91590f47e8f8701e3216cd0a0b2641203612b4122c88917188ecaebd"
+  },
+  "runtime": {
+    "graph_contract": 2,
+    "source_sha256": "2788fc017221402d572fadf3b6365efda98ba4abd4c8c09baa1f59b9c99e230d",
+    "dependencies": {
+      "langgraph": "1.2.18",
+      "langgraph-checkpoint": "4.3.1",
+      "langgraph-checkpoint-postgres": "3.2.0",
+      "openai": "3.40.0",
+      "pydantic": "2.14.1",
+      "psycopg": "3.3.6"
+    },
+    "max_model_requests": 3,
+    "max_tool_calls": 2
+  },
+  "fixture_sha256": "e25ab7f40b4afa21f6ecf648982df1474bad2c741c83456cd42b9f872905a6b7",
+  "input_sha256": {
+    "case-01": "e5f5c907906948c0192420cdb5ea9a84ff579190ec040272b02ffeac066af526",
+    "case-08": "f199fceb0daff9d12ce4f78db78f4847e1b6a984ec70285ffda917ecf85cf87a",
+    "case-10": "7d3ed79299ec43df98ef2bf9d609e004a7f70fd79e3b8949b51fd0c46ddfc679",
+    "case-11": "0c1a26a2ef7a40434a45d408651cf86cf21c56250e653fd3b1e022c9a0fe9962",
+    "case-12": "1d5d22cfbef86e763e1d307854fa6656eb4d16ee4b6b01d6d080c7350143534d"
+  }
+}
