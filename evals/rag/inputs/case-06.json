@@ -1,0 +1,20 @@
+{
+  "incident": {
+    "incident_id": "case-06",
+    "service": "catalog",
+    "summary": "New instance is not ready.",
+    "evidence": [
+      {
+        "id": "O1",
+        "timestamp": "2026-09-15T10:00:00Z",
+        "kind": "log",
+        "content": "Version 3: elapsed warm-up=35s, warm-up progress increasing, readiness reason=cache_warming."
+      }
+    ]
+  },
+  "health": {
+    "service": "catalog",
+    "evidence": []
+  },
+  "logs": null
+}

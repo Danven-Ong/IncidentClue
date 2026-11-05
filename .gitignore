@@ -65,3 +65,7 @@ mentoring/
 [Rr][Oo][Aa][Dd][Mm][Aa][Pp].[Mm][Dd]
 [Cc][Oo][Uu][Rr][Ss][Ee][Ss].[Mm][Dd]
 interview-questions.md
+
+# Local model artifacts (supplied separately, never committed)
+models/*
+!models/README.md

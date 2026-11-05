@@ -1,0 +1,20 @@
+{
+  "incident": {
+    "incident_id": "case-08",
+    "service": "billing",
+    "summary": "Dependency access is unreliable.",
+    "evidence": [
+      {
+        "id": "O1",
+        "timestamp": "2026-09-15T10:00:00Z",
+        "kind": "log",
+        "content": "Logs report both resolver failures and successful resolution followed by connection refusal across different workers; affected request mapping is absent."
+      }
+    ]
+  },
+  "health": {
+    "service": "billing",
+    "evidence": []
+  },
+  "logs": null
+}

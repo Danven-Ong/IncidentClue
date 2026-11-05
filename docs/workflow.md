@@ -1,4 +1,4 @@
-# Workflow and recovery
+# Agent workflow and recovery
 
 The browser, REST API and durable CLI share a LangGraph workflow.
 Each saved investigation has a UUID used to reopen and resume it.
@@ -9,7 +9,7 @@ Each saved investigation has a UUID used to reopen and resume it.
 flowchart TD
     Create[Create and save inputs] --> Paused[Paused]
     Paused -->|Resume| Decide[decide]
-    Decide -->|New lookup| Execute[execute: health or logs]
+    Decide -->|New lookup| Execute[execute: health, logs or runbooks]
     Execute -->|Budget remains| Decide
     Execute -->|Budget used| Diagnose[diagnose]
     Decide -->|No new lookup| Diagnose
@@ -21,9 +21,13 @@ Browser/API creation pauses with zero attempts charged; CLI `start` can execute
 immediately. Python limits each investigation to **three model requests and two
 tool attempts**, with no automatic provider retries.
 
-Tools read recorded health and log snapshots. Evidence is deduplicated;
-conflicting IDs fail. The result is a hypothesis or `insufficient_evidence`, validated against
-the supplied evidence IDs. References do not prove causation, and suggested
+GPT-OSS tool selection uses low reasoning effort within the 512-token cap.
+Final diagnosis keeps its existing 1,024-token cap and provider reasoning default.
+
+Tools read recorded health and log snapshots. Opted-in investigations can also
+retrieve [runbook guidance](rag.md), saved separately from incident evidence.
+Evidence is deduplicated; conflicting IDs fail. The result is a hypothesis or
+`insufficient_evidence`, validated against the supplied evidence IDs. References do not prove causation, and suggested
 checks are not executed.
 
 ## Where checkpoints are saved

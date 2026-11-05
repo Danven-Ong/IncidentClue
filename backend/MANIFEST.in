@@ -1,2 +1,4 @@
 include requirements-dev.lock.txt
+include requirements-runtime.lock.txt
+include requirements-rag.lock.txt
 prune tests

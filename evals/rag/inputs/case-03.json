@@ -1,0 +1,20 @@
+{
+  "incident": {
+    "incident_id": "case-03",
+    "service": "search",
+    "summary": "Database-backed requests are slow.",
+    "evidence": [
+      {
+        "id": "O1",
+        "timestamp": "2026-09-15T10:00:00Z",
+        "kind": "log",
+        "content": "Pool checked-out=20 limit=20; acquisition wait=2400ms; query duration=12ms."
+      }
+    ]
+  },
+  "health": {
+    "service": "search",
+    "evidence": []
+  },
+  "logs": null
+}

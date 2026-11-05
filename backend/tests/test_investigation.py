@@ -52,7 +52,7 @@ def selection():
 def final():
     return completion({"content": json.dumps({
         "status": "hypothesis", "probable_cause": "Missing PAYMENT_API_URL.",
-        "evidence_ids": ["H1"], "missing_evidence": ["Deployment configuration."],
+        "evidence_ids": ["H1"], "support_assessment": {"evidence_links": [{"evidence_id": "H1", "excerpt": "required configuration PAYMENT_API_URL is missing.", "relation": "The health observation records the missing required setting."}], "blocking_gaps": []}, "source_ids": [], "missing_evidence": ["Deployment configuration."],
         "next_checks": ["Inspect recorded runtime configuration."],
     })})
 
@@ -118,7 +118,7 @@ def test_malformed_selection_cli_still_writes_failure_record(tmp_path, incident,
 def abstention():
     return completion({"content": json.dumps({
         "status": "insufficient_evidence", "probable_cause": None,
-        "evidence_ids": [], "missing_evidence": ["Health observations."],
+        "evidence_ids": [], "source_ids": [], "support_assessment": {"evidence_links": [], "blocking_gaps": ["Additional observations are required; scripted response."]}, "missing_evidence": ["Health observations."],
         "next_checks": ["Collect health observations."],
     })})
 
@@ -153,6 +153,81 @@ def test_model_can_skip_lookup_and_still_get_validated_final(incident, health):
     assert result.status == "insufficient_evidence"
     assert events == [{"outcome": "not_requested"}]
     assert all(item["role"] != "tool" for item in requests[1]["messages"])
+
+
+@pytest.mark.parametrize("path", ["skip", "one", "two", "repeat", "tool_error", "provider_error"])
+def test_final_instruction_replacement_preserves_saved_history(
+    incident, health, logs, selection, log_selection, path, monkeypatch,
+):
+    from langgraph.checkpoint.memory import InMemorySaver
+
+    responses = [completion({"content": "done"})]
+    if path != "skip":
+        following = completion({"content": "done"})
+        if path == "two":
+            following = log_selection
+            following["choices"][0]["message"]["tool_calls"][0]["id"] = "call-logs"
+        elif path == "repeat":
+            following = deepcopy(selection)
+            following["choices"][0]["message"]["tool_calls"][0]["id"] = "call-repeat"
+        responses = [selection, following]
+    responses.append(400 if path == "provider_error" else abstention())
+    if path == "tool_error":
+        def unavailable(*args, **kwargs):
+            raise OSError("private failure")
+        monkeypatch.setattr(investigation, "get_service_health", unavailable)
+    requests = []
+    with fake_client(responses, requests) as client:
+        graph = investigation.build_investigation_graph(
+            client, health, logs=logs, checkpointer=InMemorySaver())
+        config = {"configurable": {"thread_id": "final-message-test"}}
+        graph.invoke(investigation.initial_investigation_state(incident), config,
+                     interrupt_before=["diagnose"])
+        checkpoint = graph.get_state(config)
+        history = deepcopy(checkpoint.values["messages"])
+        assert history[0] == {"role": "system", "content": investigation.TOOL_INSTRUCTIONS}
+        if path == "provider_error":
+            with pytest.raises(APIStatusError):
+                graph.invoke(None, config)
+        else:
+            graph.invoke(None, config)
+        assert graph.get_state(config).values["messages"] == history
+        assert graph.get_state(checkpoint.config).values["messages"] == history
+    assert requests[-1]["messages"] == [
+        {"role": "system", "content": investigation.FINAL_INSTRUCTIONS}, *history[1:]]
+    assert all(request["messages"][0] == history[0] for request in requests[:-1])
+    assert "Do not write a diagnosis here" not in requests[-1]["messages"][0]["content"]
+
+
+@pytest.mark.parametrize("model", [DEFAULT_MODEL, "openai/gpt-oss-120b", "custom-test-model"])
+def test_selection_policy_scopes_tools_and_keeps_generation_caps(incident, health, logs, model):
+    requests = []
+    original_health_tool = deepcopy(investigation.HEALTH_TOOL)
+    original_log_tool = deepcopy(investigation.LOG_TOOL)
+    with fake_client([completion({"content": "done"}), abstention()], requests) as client:
+        investigation.investigate_incident(incident, client, health, model, logs=logs)
+    selection, diagnosis = requests
+    if model.startswith("openai/gpt-oss-"):
+        assert selection["reasoning_effort"] == "low"
+    else:
+        assert "reasoning_effort" not in selection
+    assert "reasoning_effort" not in diagnosis
+    assert selection["max_completion_tokens"] == 512
+    assert diagnosis["max_completion_tokens"] == 1024
+    assert {tool["function"]["name"] for tool in selection["tools"]} == {"get_service_health", "get_logs"}
+    for tool in selection["tools"]:
+        assert tool["function"]["parameters"]["properties"]["service"]["enum"] == [incident.service]
+    assert investigation.HEALTH_TOOL == original_health_tool
+    assert investigation.LOG_TOOL == original_log_tool
+
+
+def test_health_only_prompt_and_schema_do_not_offer_logs(incident, health):
+    requests = []
+    with fake_client([completion({"content": "done"}), abstention()], requests) as client:
+        investigation.investigate_incident(incident, client, health)
+    selection = requests[0]
+    assert [tool["function"]["name"] for tool in selection["tools"]] == ["get_service_health"]
+    assert "get_logs" not in json.dumps(selection)
 
 
 @pytest.mark.parametrize("arguments", [
@@ -223,6 +298,8 @@ def test_incomplete_selection_fails_without_final_request(incident, health, sele
     with fake_client([selection], requests) as client, pytest.raises(DiagnosisError):
         investigation.investigate_incident(incident, client, health)
     assert len(requests) == 1
+    assert requests[0]["reasoning_effort"] == "low"
+    assert requests[0]["max_completion_tokens"] == 512
 
 
 @pytest.mark.parametrize("responses", [[429], ["timeout"], ["selection", "timeout"]])
@@ -355,6 +432,7 @@ def log_final(final):
     final = deepcopy(final)
     payload = json.loads(final["choices"][0]["message"]["content"])
     payload["evidence_ids"] = ["L2"]
+    payload["support_assessment"]["evidence_links"][0].update(evidence_id="L2", excerpt="PAYMENT_API_URL")
     final["choices"][0]["message"]["content"] = json.dumps(payload)
     return final
 
@@ -387,6 +465,7 @@ def test_unconfigured_log_tool_rejected(incident, health, log_selection):
 def test_cannot_cite_logs_outside_returned_window(incident, health, logs, log_selection, log_final):
     payload = json.loads(log_final["choices"][0]["message"]["content"])
     payload["evidence_ids"] = ["L0"]
+    payload["support_assessment"]["evidence_links"][0]["evidence_id"] = "L0"
     log_final["choices"][0]["message"]["content"] = json.dumps(payload)
     with fake_client([log_selection, completion({"content": "Enough evidence."}), log_final], []) as client, pytest.raises(DiagnosisError, match="outside"):
         investigation.investigate_incident(incident, client, health, logs=logs)
@@ -533,6 +612,7 @@ def test_same_call_id_cannot_be_reused(incident, health, selection):
 def test_final_invalid_citation_fails_in_validate_node(incident, health, selection, final):
     payload = json.loads(final["choices"][0]["message"]["content"])
     payload["evidence_ids"] = ["invented"]
+    payload["support_assessment"]["evidence_links"][0]["evidence_id"] = "invented"
     final["choices"][0]["message"]["content"] = json.dumps(payload)
     steps = []
     with fake_client([selection, completion({"content": "Enough."}), final], []) as client, pytest.raises(DiagnosisError, match="outside"):

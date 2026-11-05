@@ -1,4 +1,4 @@
-# Allow only the backend build inputs into the build context.
+# Allow only application source, dependency locks and version 1 runbooks.
 **
 !backend/
 !backend/Dockerfile
@@ -7,7 +7,15 @@
 !backend/MANIFEST.in
 !backend/requirements-dev.lock.txt
 !backend/requirements-runtime.lock.txt
+!backend/requirements-rag.lock.txt
 !backend/src/
 !backend/src/incidentclue/
-!backend/src/incidentclue/*.py
+!backend/src/incidentclue/**
+!data/
+!data/runbooks/
+!data/runbooks/*.md
+!data/runbooks/manifest.json
 !.dockerignore
+.venv/
+backend/.pytest_cache/
+**/__pycache__/

@@ -1,0 +1,20 @@
+{
+  "incident": {
+    "incident_id": "case-20",
+    "service": "shipping",
+    "summary": "Carrier requests exceed deadlines.",
+    "evidence": [
+      {
+        "id": "O1",
+        "timestamp": "2026-09-15T10:00:00Z",
+        "kind": "log",
+        "content": "Client traces report 5s downstream duration; downstream traces report 20ms for apparently matching requests, but trace identity and clock alignment are unverified."
+      }
+    ]
+  },
+  "health": {
+    "service": "shipping",
+    "evidence": []
+  },
+  "logs": null
+}

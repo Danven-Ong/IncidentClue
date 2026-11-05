@@ -19,7 +19,17 @@ These are backend paths. The browser uses an `/api` prefix that the proxy remove
 | POST | `/investigations/{identifier}/resume` | Continue until completion, pause or failure |
 | POST | `/investigations/{identifier}/pause` | Request a pause at a saved boundary |
 
-See [workflow and recovery](workflow.md) for saved state, budgets and crash recovery.
+See [agent workflow and recovery](workflow.md) for saved state, budgets and crash recovery.
+
+## Optional runbook retrieval
+
+Responses include optional runbook retrieval fields:
+
+| Field | Meaning |
+| --- | --- |
+| `retrieval` | Saved retrieval configuration; `null` when disabled |
+| `state.retrieved_sources` | Retrieved runbook passages, separate from incident evidence |
+| `state.diagnosis.source_ids` | References to retrieved passages cited by the diagnosis |
 
 ## Error codes
 

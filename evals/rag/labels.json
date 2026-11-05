@@ -1,0 +1,257 @@
+{
+  "schema_version": 1,
+  "labels": [
+    {
+      "id": "case-01",
+      "family": "env-validation",
+      "category": "answerable",
+      "must_abstain": false,
+      "relevance": {
+        "configuration#mechanism": 2,
+        "configuration#checks": 2
+      },
+      "canary": "EVALUATOR_ONLY_RAG_01_DO_NOT_EXPOSE"
+    },
+    {
+      "id": "case-02",
+      "family": "resolver-nxdomain",
+      "category": "answerable",
+      "must_abstain": false,
+      "relevance": {
+        "dns#mechanism": 2,
+        "dns#checks": 2
+      },
+      "canary": "EVALUATOR_ONLY_RAG_02_DO_NOT_EXPOSE"
+    },
+    {
+      "id": "case-03",
+      "family": "pool-acquire",
+      "category": "answerable",
+      "must_abstain": false,
+      "relevance": {
+        "pool#mechanism": 2,
+        "pool#checks": 2
+      },
+      "canary": "EVALUATOR_ONLY_RAG_03_DO_NOT_EXPOSE"
+    },
+    {
+      "id": "case-04",
+      "family": "schema-version",
+      "category": "answerable",
+      "must_abstain": false,
+      "relevance": {
+        "compatibility#mechanism": 2,
+        "compatibility#checks": 2
+      },
+      "canary": "EVALUATOR_ONLY_RAG_04_DO_NOT_EXPOSE"
+    },
+    {
+      "id": "case-05",
+      "family": "downstream-duration",
+      "category": "answerable",
+      "must_abstain": false,
+      "relevance": {
+        "latency#mechanism": 2,
+        "latency#checks": 2
+      },
+      "canary": "EVALUATOR_ONLY_RAG_05_DO_NOT_EXPOSE"
+    },
+    {
+      "id": "case-06",
+      "family": "catalog-warmup",
+      "category": "answerable",
+      "must_abstain": false,
+      "relevance": {
+        "catalog-readiness#mechanism": 2,
+        "catalog-readiness#checks": 2
+      },
+      "canary": "EVALUATOR_ONLY_RAG_06_DO_NOT_EXPOSE"
+    },
+    {
+      "id": "case-07",
+      "family": "conflicting-pool-samples",
+      "category": "ambiguous",
+      "must_abstain": true,
+      "relevance": {
+        "inventory-pool#mechanism": 2,
+        "inventory-pool#checks": 2
+      },
+      "canary": "EVALUATOR_ONLY_RAG_07_DO_NOT_EXPOSE"
+    },
+    {
+      "id": "case-08",
+      "family": "simultaneous-network-errors",
+      "category": "ambiguous",
+      "must_abstain": true,
+      "relevance": {
+        "dns#mechanism": 2,
+        "dns#checks": 2
+      },
+      "canary": "EVALUATOR_ONLY_RAG_08_DO_NOT_EXPOSE"
+    },
+    {
+      "id": "case-09",
+      "family": "generic-latency",
+      "category": "insufficient",
+      "must_abstain": true,
+      "relevance": {
+        "latency#mechanism": 2,
+        "latency#checks": 2
+      },
+      "canary": "EVALUATOR_ONLY_RAG_09_DO_NOT_EXPOSE"
+    },
+    {
+      "id": "case-10",
+      "family": "release-proximity",
+      "category": "insufficient",
+      "must_abstain": true,
+      "relevance": {
+        "evidence#mechanism": 2,
+        "evidence#checks": 2
+      },
+      "canary": "EVALUATOR_ONLY_RAG_10_DO_NOT_EXPOSE"
+    },
+    {
+      "id": "case-11",
+      "family": "disk-full",
+      "category": "no_guidance",
+      "must_abstain": false,
+      "relevance": {},
+      "canary": "EVALUATOR_ONLY_RAG_11_DO_NOT_EXPOSE"
+    },
+    {
+      "id": "case-12",
+      "family": "unknown-upload",
+      "category": "no_guidance",
+      "must_abstain": true,
+      "relevance": {},
+      "canary": "EVALUATOR_ONLY_RAG_12_DO_NOT_EXPOSE"
+    },
+    {
+      "id": "case-13",
+      "family": "blank-config-value",
+      "category": "answerable",
+      "must_abstain": false,
+      "relevance": {
+        "configuration#mechanism": 2,
+        "configuration#checks": 2
+      },
+      "canary": "EVALUATOR_ONLY_RAG_13_DO_NOT_EXPOSE"
+    },
+    {
+      "id": "case-14",
+      "family": "resolver-servfail",
+      "category": "answerable",
+      "must_abstain": false,
+      "relevance": {
+        "dns#mechanism": 2,
+        "dns#checks": 2
+      },
+      "canary": "EVALUATOR_ONLY_RAG_14_DO_NOT_EXPOSE"
+    },
+    {
+      "id": "case-15",
+      "family": "refused-listener",
+      "category": "answerable",
+      "must_abstain": false,
+      "relevance": {
+        "connectivity#mechanism": 2,
+        "connectivity#checks": 2
+      },
+      "canary": "EVALUATOR_ONLY_RAG_15_DO_NOT_EXPOSE"
+    },
+    {
+      "id": "case-16",
+      "family": "missing-column",
+      "category": "answerable",
+      "must_abstain": false,
+      "relevance": {
+        "compatibility#mechanism": 2,
+        "compatibility#checks": 2
+      },
+      "canary": "EVALUATOR_ONLY_RAG_16_DO_NOT_EXPOSE"
+    },
+    {
+      "id": "case-17",
+      "family": "idle-pool-slow-query",
+      "category": "answerable",
+      "must_abstain": false,
+      "relevance": {
+        "inventory-pool#mechanism": 2,
+        "inventory-pool#checks": 2
+      },
+      "canary": "EVALUATOR_ONLY_RAG_17_DO_NOT_EXPOSE"
+    },
+    {
+      "id": "case-18",
+      "family": "catalog-post-warmup-db",
+      "category": "answerable",
+      "must_abstain": false,
+      "relevance": {
+        "catalog-database#mechanism": 2,
+        "catalog-database#checks": 2
+      },
+      "canary": "EVALUATOR_ONLY_RAG_18_DO_NOT_EXPOSE"
+    },
+    {
+      "id": "case-19",
+      "family": "inconsistent-effective-config",
+      "category": "ambiguous",
+      "must_abstain": true,
+      "relevance": {
+        "configuration#mechanism": 2,
+        "configuration#checks": 2
+      },
+      "canary": "EVALUATOR_ONLY_RAG_19_DO_NOT_EXPOSE"
+    },
+    {
+      "id": "case-20",
+      "family": "latency-clock-conflict",
+      "category": "ambiguous",
+      "must_abstain": true,
+      "relevance": {
+        "latency#mechanism": 2,
+        "latency#checks": 2
+      },
+      "canary": "EVALUATOR_ONLY_RAG_20_DO_NOT_EXPOSE"
+    },
+    {
+      "id": "case-21",
+      "family": "unready-without-reason",
+      "category": "insufficient",
+      "must_abstain": true,
+      "relevance": {
+        "readiness#mechanism": 2,
+        "readiness#checks": 2
+      },
+      "canary": "EVALUATOR_ONLY_RAG_21_DO_NOT_EXPOSE"
+    },
+    {
+      "id": "case-22",
+      "family": "timeout-without-phase",
+      "category": "insufficient",
+      "must_abstain": true,
+      "relevance": {
+        "pool#mechanism": 2,
+        "pool#checks": 2
+      },
+      "canary": "EVALUATOR_ONLY_RAG_22_DO_NOT_EXPOSE"
+    },
+    {
+      "id": "case-23",
+      "family": "tls-expiry",
+      "category": "no_guidance",
+      "must_abstain": false,
+      "relevance": {},
+      "canary": "EVALUATOR_ONLY_RAG_23_DO_NOT_EXPOSE"
+    },
+    {
+      "id": "case-24",
+      "family": "wrong-output",
+      "category": "no_guidance",
+      "must_abstain": true,
+      "relevance": {},
+      "canary": "EVALUATOR_ONLY_RAG_24_DO_NOT_EXPOSE"
+    }
+  ]
+}

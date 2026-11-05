@@ -1,6 +1,7 @@
 export type JsonObject = Record<string, unknown>;
 export type Counts = { model: number; tool: number };
 export type Inspection = {
+  retrieval?: JsonObject | null;
   investigation_id: string; incident_id: string;
   status: 'ready' | 'running' | 'paused' | 'completed' | 'failed' | 'recovery_required';
   executing: boolean; recovery_needed: boolean; compatible: boolean; pause_requested: boolean;

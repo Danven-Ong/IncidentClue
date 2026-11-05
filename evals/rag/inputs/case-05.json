@@ -1,0 +1,20 @@
+{
+  "incident": {
+    "incident_id": "case-05",
+    "service": "notifications",
+    "summary": "Delivery requests exceed deadlines.",
+    "evidence": [
+      {
+        "id": "O1",
+        "timestamp": "2026-09-15T10:00:00Z",
+        "kind": "log",
+        "content": "Dependency handshake=8ms; response duration=6200ms; downstream reports p99=6100ms in the same interval."
+      }
+    ]
+  },
+  "health": {
+    "service": "notifications",
+    "evidence": []
+  },
+  "logs": null
+}

@@ -1,0 +1,132 @@
+{
+  "schema_version": 3,
+  "status": "eligible_development_candidate_only",
+  "source_commit": "41a8294efb8d3656ee5b0424ca50b84599bb3d4b",
+  "protocol_sha256": "1b14ecf8085355fdea69941c1b8074c2418e42d36a9ab7fe222378a31ac8b2f2",
+  "runner_sha256": "890c2210cd635866ee07203b5ea740e01850a2e2fd66b7fb1b98743c3ee3f98d",
+  "helper_sha256": {
+    "retrieval.py": "c9eacb6d91590f47e8f8701e3216cd0a0b2641203612b4122c88917188ecaebd",
+    "representation.py": "c68f043f1542ee11dfd95f52bc9102d92bc72f74d998e4cd4cb75a3de555ccc8"
+  },
+  "raw_report_name": "rag-runbook-development-20261104-a.jsonl",
+  "raw_report_sha256": "df57ca2c506f6075a47e9506b76d6be1f30c81e5fb4d08687d1381fed135e03f",
+  "prior_raw_report_sha256": "9b153f3258f8c231eba5f6d6d2e2de2a4ed22944aaeadbedbe7ae6bd6f614e0b",
+  "source_excerpt_audit_count": 124,
+  "summary": {
+    "type": "summary",
+    "fixture_sha256": "e25ab7f40b4afa21f6ecf648982df1474bad2c741c83456cd42b9f872905a6b7",
+    "split": "development",
+    "controls": {
+      "0.25": {
+        "planned": 12,
+        "assessed": 12,
+        "nonempty_relevance_cases": 10,
+        "recall_at_3": 0.3,
+        "mrr_at_3": 0.4,
+        "ndcg_at_3": 0.29197207891481874,
+        "precision_at_3": 0.16666666666666666,
+        "hit_cases": 5,
+        "answerable_cases": 6,
+        "answerable_hits": 3,
+        "no_guidance_cases": 2,
+        "no_guidance_false_positives": 0,
+        "empty_results": 4,
+        "scope_version_violations": 0
+      },
+      "0.3": {
+        "planned": 12,
+        "assessed": 12,
+        "nonempty_relevance_cases": 10,
+        "recall_at_3": 0.6,
+        "mrr_at_3": 0.6,
+        "ndcg_at_3": 0.5226294385530916,
+        "precision_at_3": 0.3333333333333333,
+        "hit_cases": 8,
+        "answerable_cases": 6,
+        "answerable_hits": 5,
+        "no_guidance_cases": 2,
+        "no_guidance_false_positives": 0,
+        "empty_results": 2,
+        "scope_version_violations": 0
+      }
+    },
+    "candidate": {
+      "0.25": {
+        "planned": 12,
+        "assessed": 12,
+        "nonempty_relevance_cases": 10,
+        "recall_at_3": 0.7,
+        "mrr_at_3": 0.7,
+        "ndcg_at_3": 0.7,
+        "precision_at_3": 0.38888888888888884,
+        "hit_cases": 7,
+        "answerable_cases": 6,
+        "answerable_hits": 4,
+        "no_guidance_cases": 2,
+        "no_guidance_false_positives": 0,
+        "empty_results": 4,
+        "scope_version_violations": 0
+      },
+      "0.3": {
+        "planned": 12,
+        "assessed": 12,
+        "nonempty_relevance_cases": 10,
+        "recall_at_3": 0.95,
+        "mrr_at_3": 0.9333333333333333,
+        "ndcg_at_3": 0.930657359638273,
+        "precision_at_3": 0.5277777777777778,
+        "hit_cases": 10,
+        "answerable_cases": 6,
+        "answerable_hits": 6,
+        "no_guidance_cases": 2,
+        "no_guidance_false_positives": 0,
+        "empty_results": 2,
+        "scope_version_violations": 0
+      }
+    },
+    "lexical_or": {
+      "planned": 12,
+      "assessed": 12,
+      "nonempty_relevance_cases": 10,
+      "recall_at_3": 0.6,
+      "mrr_at_3": 0.6833333333333333,
+      "ndcg_at_3": 0.5532867981913646,
+      "precision_at_3": 0.3333333333333333,
+      "hit_cases": 9,
+      "answerable_cases": 6,
+      "answerable_hits": 6,
+      "no_guidance_cases": 2,
+      "no_guidance_false_positives": 2,
+      "empty_results": 0,
+      "scope_version_violations": 0
+    },
+    "selected_cutoff": 0.3,
+    "retrieval_operations": 60,
+    "control_matches": 36,
+    "passage_embedding_batches": 2,
+    "query_vectors": 12,
+    "publications": [
+      {
+        "corpus_id": "d660b3f579425c19b772d69aabb10e1fda5232817dc40ccf22eb8afa34674d2b",
+        "published": true,
+        "passages": 36
+      },
+      {
+        "corpus_id": "c1be6289819cdd3496172881a7603e692a7203c4ea1ac7ab539a5bc6d724f922",
+        "published": true,
+        "passages": 36
+      },
+      {
+        "corpus_id": "adbadadfbcd818015900b0f59636d07f545743523ecb6e5afbea1177f06ad9f9",
+        "published": true,
+        "passages": 36
+      }
+    ],
+    "elapsed_seconds": 7.271773299900815,
+    "provider_calls": 0,
+    "held_out_scored": 0,
+    "runtime_promoted": false,
+    "diagnosis_quality_assessed": false,
+    "latency_note": "Cached repeats; not a latency benchmark"
+  }
+}

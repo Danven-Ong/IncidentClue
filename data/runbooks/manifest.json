@@ -1,0 +1,163 @@
+{
+  "schema_version": 1,
+  "synthetic": true,
+  "chunk_policy": "markdown-h2-v1",
+  "documents": [
+    {
+      "id": "configuration",
+      "path": "data/runbooks/configuration.md",
+      "title": "Required configuration",
+      "version": "1",
+      "effective_date": "2026-09-01",
+      "services": [
+        "global"
+      ],
+      "status": "current",
+      "superseded_by": null,
+      "sha256": "8e4f1e2e4d4df821ac4ede570e386c96e08407ba71d68019b269525d885f3b84"
+    },
+    {
+      "id": "readiness",
+      "path": "data/runbooks/readiness.md",
+      "title": "Readiness and dependency initialization",
+      "version": "1",
+      "effective_date": "2026-09-01",
+      "services": [
+        "global"
+      ],
+      "status": "current",
+      "superseded_by": null,
+      "sha256": "dcf375b3c2e46e4a9543ac0fd7318e4e51d941c5d84d0b067ec67a88f9ee5788"
+    },
+    {
+      "id": "compatibility",
+      "path": "data/runbooks/compatibility.md",
+      "title": "Application and database compatibility",
+      "version": "1",
+      "effective_date": "2026-09-01",
+      "services": [
+        "global"
+      ],
+      "status": "current",
+      "superseded_by": null,
+      "sha256": "252a85abaa665f46b78a89c26649e492ad18a15627473cdd3d7b5a8fb0f81bcf"
+    },
+    {
+      "id": "dns",
+      "path": "data/runbooks/dns.md",
+      "title": "Dependency name resolution",
+      "version": "1",
+      "effective_date": "2026-09-01",
+      "services": [
+        "global"
+      ],
+      "status": "current",
+      "superseded_by": null,
+      "sha256": "d84c8a52ac6001753d3ee01ca516985bd4ff2042480fb66cee867124922a9056"
+    },
+    {
+      "id": "connectivity",
+      "path": "data/runbooks/connectivity.md",
+      "title": "Dependency connection establishment",
+      "version": "1",
+      "effective_date": "2026-09-01",
+      "services": [
+        "global"
+      ],
+      "status": "current",
+      "superseded_by": null,
+      "sha256": "d6a1f6a59f6fa2757dd8b5e6479bcb0c61c1820ab57a346f3531bd8702487c27"
+    },
+    {
+      "id": "latency",
+      "path": "data/runbooks/latency.md",
+      "title": "Slow dependency responses",
+      "version": "1",
+      "effective_date": "2026-09-01",
+      "services": [
+        "global"
+      ],
+      "status": "current",
+      "superseded_by": null,
+      "sha256": "efbdc7541c6ae523c0893db427e0a40080f8b7e46f95055cc7486600abc85dc9"
+    },
+    {
+      "id": "pool",
+      "path": "data/runbooks/pool.md",
+      "title": "Database connection-pool exhaustion",
+      "version": "1",
+      "effective_date": "2026-09-01",
+      "services": [
+        "global"
+      ],
+      "status": "current",
+      "superseded_by": null,
+      "sha256": "f16299dffe15710ad360e16d62e6cb2f14bc8ee4577a331e86ff9084a1db0259"
+    },
+    {
+      "id": "evidence",
+      "path": "data/runbooks/evidence.md",
+      "title": "Collecting evidence without asserting a cause",
+      "version": "1",
+      "effective_date": "2026-09-01",
+      "services": [
+        "global"
+      ],
+      "status": "current",
+      "superseded_by": null,
+      "sha256": "6662e5ee19336e9c56f5ee927b39cf4cdeab775cb3c40937e8fa2340d431cf03"
+    },
+    {
+      "id": "catalog-readiness",
+      "path": "data/runbooks/catalog-readiness.md",
+      "title": "Catalog warm-up readiness",
+      "version": "1",
+      "effective_date": "2026-09-01",
+      "services": [
+        "catalog"
+      ],
+      "status": "current",
+      "superseded_by": null,
+      "sha256": "eee9ad84aa1f7248d8b7498cba95f84b5f776618f855135d77e8d28d737ac98a"
+    },
+    {
+      "id": "inventory-pool",
+      "path": "data/runbooks/inventory-pool.md",
+      "title": "Inventory pool measurement exception",
+      "version": "1",
+      "effective_date": "2026-09-01",
+      "services": [
+        "inventory"
+      ],
+      "status": "current",
+      "superseded_by": null,
+      "sha256": "fddc6bf34edb69afad1af29bf252d6d562977a07b80844abd0ecb05883886cb0"
+    },
+    {
+      "id": "dns-legacy",
+      "path": "data/runbooks/dns-legacy.md",
+      "title": "Legacy dependency resolver policy",
+      "version": "1",
+      "effective_date": "2026-09-01",
+      "services": [
+        "global"
+      ],
+      "status": "superseded",
+      "superseded_by": "dns",
+      "sha256": "0333bd2122137aadec4f42ad5ebe1e6b03f4cebdec0d5753906da1cd7ea3e4a8"
+    },
+    {
+      "id": "catalog-database",
+      "path": "data/runbooks/catalog-database.md",
+      "title": "Catalog database readiness checks",
+      "version": "1",
+      "effective_date": "2026-09-01",
+      "services": [
+        "catalog"
+      ],
+      "status": "current",
+      "superseded_by": null,
+      "sha256": "d87186f132c2a621cee165528afa041a7836fad793b391c6c8a47f3f519d8a80"
+    }
+  ]
+}

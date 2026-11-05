@@ -18,11 +18,76 @@ function Evidence({ value }: { value: unknown }) {
     </article>;
   })}</div>;
 }
+
+export function RunbookSources({ state }: { state: JsonObject }) {
+  const sources = Array.isArray(state.retrieved_sources) ? state.retrieved_sources : [];
+  const diagnosis = isObject(state.diagnosis) ? state.diagnosis : null;
+  const citedIds = diagnosis && strings(diagnosis.source_ids) ? [...new Set(diagnosis.source_ids)] : [];
+  const citedIdSet = new Set(citedIds);
+  const savedSource = (id: string) => sources.find(source => isObject(source) && source.id === id && typeof source.text === 'string');
+  const unavailableCitedIds = citedIds.filter(id => !savedSource(id));
+  const lookedUp = Array.isArray(state.tool_history) && state.tool_history.some(h => isObject(h) && h.name === 'get_runbook_context');
+  return <section className="content-section"><h2>Runbook guidance</h2>
+    <p className="hint">General guidance, separate from incident observations. The answer references passages overall; it does not map a passage to each check. Saved excerpts preserve the returned version.</p>
+    {!!citedIds.length && <><h3>Answer references</h3><div className="references" aria-label="Answer-level runbook references">
+      {citedIds.map(id => {
+        const source = savedSource(id);
+        return source ? <button key={id} className="reference" onClick={() => {
+          const node = document.getElementById('source-' + encodeURIComponent(id)); node?.scrollIntoView({ block: 'center' }); node?.focus();
+        }}>{text(source.title)} · {text(source.section)}</button> : <span key={id}><code>{id}</code> · passage unavailable</span>;
+      })}
+    </div></>}
+    {!sources.length && <p className="muted">{lookedUp ? 'The lookup returned no matching passages.' : 'No runbook lookup has been saved.'}</p>}
+    <div className="evidence-list">{sources.map((s, i) => {
+      if (!isObject(s) || typeof s.id !== 'string' || typeof s.text !== 'string')
+        return <JsonDetails key={i} label="Unrecognised saved source" value={s} />;
+      return <article className="evidence" id={'source-' + encodeURIComponent(s.id)} key={s.id} tabIndex={-1}>
+        <h3>{text(s.title)} · version {text(s.document_version)}</h3>
+        <p className="muted">{text(s.section)} · lines {String(s.line_start)}–{String(s.line_end)}</p>
+        {citedIdSet.has(s.id) && <p className="muted">Referenced by the answer</p>}
+        <p className="preserve">{s.text}</p>
+        <details><summary>Source identity and location</summary><p>{text(s.path)}</p>
+          <p>Document SHA256: <code>{text(s.document_sha256)}</code></p><p>Corpus: <code>{text(s.corpus_id)}</code></p></details>
+      </article>;
+    })}</div>
+    {!!unavailableCitedIds.length && <p className="muted">One or more referenced passage excerpts were not saved with this investigation.</p>}
+  </section>;
+}
+export function DiagnosisSupport({ state }: { state: JsonObject }) {
+  const support = isObject(state.diagnosis) ? state.diagnosis.support_assessment : null;
+  if (support == null) return <section className="support-assessment"><h3>Evidence support</h3>
+    <p className="muted">No support explanation was saved for this result.</p></section>;
+  if (!isObject(support) || !strings(support.blocking_gaps) || !Array.isArray(support.evidence_links)
+    || !support.evidence_links.every(link => isObject(link) && typeof link.evidence_id === 'string'
+      && typeof link.excerpt === 'string' && typeof link.relation === 'string'))
+    return <section className="support-assessment"><h3>Evidence support</h3>
+      <p className="muted">Saved support format is not recognised.</p><JsonDetails label="Support details" value={support} /></section>;
+  const evidence = Array.isArray(state.evidence) ? state.evidence.filter(isObject) : [];
+  return <section className="support-assessment"><h3>Evidence support</h3>
+    <p className="hint">Model explanations for review. Exact excerpts do not confirm causation.</p>
+    {support.evidence_links.map((link, i) => {
+      const observation = evidence.find(e => e.id === link.evidence_id);
+      return <div className="support-link" key={i}>
+        <p>Excerpt from <code>{link.evidence_id}</code></p>
+        <blockquote className="preserve">{link.excerpt}</blockquote>
+        <p className="preserve">{link.relation}</p>
+        {observation ? <details><summary>Full observation {link.evidence_id}</summary>
+          <p className="preserve">{text(observation.content)}</p></details>
+          : <p className="muted">The cited observation is unavailable.</p>}
+      </div>;
+    })}
+    <h3>Reported blocking gaps</h3>
+    {support.blocking_gaps.length ? <ul>{support.blocking_gaps.map((gap, i) => <li key={i}>{gap}</li>)}</ul>
+      : <p className="muted">No blocking gaps reported by the model.</p>}
+  </section>;
+}
+
 function Diagnosis({ state }: { state: JsonObject }) {
   const d = state.diagnosis;
   if (!isObject(d)) return <p className="muted">No validated diagnosis saved.</p>;
   const known = ['hypothesis', 'insufficient_evidence'].includes(String(d.status))
     && strings(d.evidence_ids) && strings(d.missing_evidence) && strings(d.next_checks)
+    && (d.source_ids === undefined || strings(d.source_ids))
     && (d.status === 'hypothesis' ? typeof d.probable_cause === 'string' && !!d.probable_cause.trim()
       && Array.isArray(d.evidence_ids) && d.evidence_ids.length > 0 : d.probable_cause === null);
   if (!known) return <><p className="muted">Saved diagnosis format is not recognised.</p><JsonDetails label="Diagnosis details" value={d} /></>;
@@ -42,8 +107,10 @@ function Diagnosis({ state }: { state: JsonObject }) {
     <div className="result-grid"><section><h3>Missing evidence</h3>{(d.missing_evidence as string[]).length
       ? <ul>{(d.missing_evidence as string[]).map((s, i) => <li key={i}>{s}</li>)}</ul> : <p className="muted">None recorded.</p>}</section>
       <section><h3>Suggested next checks</h3>{(d.next_checks as string[]).length
-        ? <ul>{(d.next_checks as string[]).map((s, i) => <li key={i}>{s}</li>)}</ul> : <p className="muted">None recorded.</p>}
-        <p className="hint">Suggestions only. No remediation is executed.</p></section></div>
+        ? <><ul>{(d.next_checks as string[]).map((s, i) => <li key={i}>{s}</li>)}</ul>
+          <p className="hint">Suggested diagnostics only. Confirm each applies to this service and environment before running it. No remediation is executed.</p></>
+        : <p className="muted">None recorded.</p>}</section></div>
+    <DiagnosisSupport state={state} />
   </>;
 }
 
@@ -57,6 +124,8 @@ export function Investigation({ id }: { id: string }) {
     && (data.status === 'completed' || (data.compatible && !['failed', 'recovery_required'].includes(data.status)));
   const canPause = data && !view.stale && !terminal && !view.pausePending && !data.pause_requested;
   const incident = data && isObject(data.state.incident) ? data.state.incident : null;
+  const hasRunbookReferences = data && isObject(data.state.diagnosis) && strings(data.state.diagnosis.source_ids)
+    && data.state.diagnosis.source_ids.length > 0;
   async function copy() {
     try { await navigator.clipboard.writeText(id); setCopied('UUID copied.'); }
     catch { setCopied('Could not copy. Select the UUID below.'); }
@@ -96,6 +165,8 @@ export function Investigation({ id }: { id: string }) {
       </section>}
       {data.status !== 'completed' && diagnosis}
       <section className="content-section"><h2>Evidence</h2><Evidence value={data.state.evidence} /></section>
+      {(isObject(data.state.retrieval) || (Array.isArray(data.state.retrieved_sources) && data.state.retrieved_sources.length > 0)
+        || hasRunbookReferences) && <RunbookSources state={data.state} />}
       <section className="content-section"><h2>Saved activity</h2>
         {Array.isArray(data.state.tool_history) && data.state.tool_history.length > 0
           ? data.state.tool_history.map((item, i) => <JsonDetails key={i} label={`Tool record ${i + 1}`} value={item} />)

@@ -1,9 +1,26 @@
 name: incidentclue
 
+x-backend: &backend
+  image: ${INCIDENTCLUE_IMAGE:-incidentclue:local}
+  build:
+    context: .
+    dockerfile: backend/Dockerfile
+  read_only: true
+  tmpfs:
+    - /tmp:uid=10001,gid=10001,mode=0700
+
+x-model-volume: &model-volume
+  type: bind
+  source: ${INCIDENTCLUE_RAG_MODEL_DIR:-./models}
+  target: /models/embedding
+  read_only: true
+  bind:
+    create_host_path: false
+
 services:
   postgres:
-    image: postgres:17-bookworm@sha256:839fbb5a4942a7758dd93e18b42ea5649807491a0545b5eeeb8f0b8bb11857a5
-    profiles: [durable, web, frontend]
+    image: pgvector/pgvector:0.8.1-pg17@sha256:99a149d3c84cfb0f32d8da7d72737e4643468787220af2223418730f8e9e9cdc
+    profiles: [durable, web, frontend, admin]
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-incidentclue}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-local-development-only}
@@ -19,19 +36,17 @@ services:
       retries: 30
 
   durable:
-    image: incidentclue:local
+    <<: *backend
     profiles: [durable]
-    build:
-      context: .
-      dockerfile: backend/Dockerfile
-    read_only: true
     depends_on:
       postgres:
         condition: service_healthy
     environment:
       # Override the complete URI when using credentials that need URI encoding.
       INCIDENTCLUE_DATABASE_URL: ${INCIDENTCLUE_COMPOSE_DATABASE_URL:-postgresql://incidentclue:local-development-only@postgres:5432/incidentclue}
+      INCIDENTCLUE_RAG_MODEL_DIR: /models/embedding
     volumes:
+      - *model-volume
       - type: bind
         source: ./data/synthetic
         target: /inputs
@@ -47,12 +62,8 @@ services:
     command: ["--help"]
 
   storage-setup:
-    image: incidentclue:local
+    <<: *backend
     profiles: [web, frontend]
-    build:
-      context: .
-      dockerfile: backend/Dockerfile
-    read_only: true
     depends_on:
       postgres:
         condition: service_healthy
@@ -62,12 +73,8 @@ services:
     command: []
 
   web:
-    image: incidentclue:local
+    <<: *backend
     profiles: [web, frontend]
-    build:
-      context: .
-      dockerfile: backend/Dockerfile
-    read_only: true
     depends_on:
       postgres:
         condition: service_healthy
@@ -75,8 +82,12 @@ services:
         condition: service_completed_successfully
     environment:
       INCIDENTCLUE_DATABASE_URL: ${INCIDENTCLUE_COMPOSE_DATABASE_URL:-postgresql://incidentclue:local-development-only@postgres:5432/incidentclue}
+      INCIDENTCLUE_RAG_CORPUS_ID: ${INCIDENTCLUE_RAG_CORPUS_ID:-}
+      INCIDENTCLUE_RAG_MODEL_DIR: /models/embedding
       GROQ_API_KEY: ${GROQ_API_KEY:-}
       GROQ_MODEL: ${GROQ_MODEL:-openai/gpt-oss-20b}
+    volumes:
+      - *model-volume
     ports:
       - "127.0.0.1:${INCIDENTCLUE_WEB_PORT:-8000}:8000"
     entrypoint: [python, -m, uvicorn]
@@ -115,11 +126,7 @@ services:
       retries: 20
 
   incidentclue:
-    image: incidentclue:local
-    build:
-      context: .
-      dockerfile: backend/Dockerfile
-    read_only: true
+    <<: *backend
     network_mode: ${INCIDENTCLUE_NETWORK_MODE:-bridge}
     volumes:
       - type: bind
@@ -148,6 +155,40 @@ services:
       - /config/provider.env
       - --record-dir
       - /app/runs
+
+  rag-setup:
+    <<: *backend
+    profiles: [admin]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      INCIDENTCLUE_DATABASE_URL: ${INCIDENTCLUE_COMPOSE_DATABASE_URL:-postgresql://incidentclue:local-development-only@postgres:5432/incidentclue}
+    entrypoint: [python, -m, incidentclue.rag]
+    command: [setup]
+
+  rag-ingest:
+    <<: *backend
+    profiles: [admin]
+    depends_on:
+      rag-setup:
+        condition: service_completed_successfully
+    environment:
+      INCIDENTCLUE_DATABASE_URL: ${INCIDENTCLUE_COMPOSE_DATABASE_URL:-postgresql://incidentclue:local-development-only@postgres:5432/incidentclue}
+    volumes:
+      - *model-volume
+    entrypoint: [python, -m, incidentclue.rag]
+    command: [ingest, --root, /opt/incidentclue, --max-distance, "0.3", --model-dir, /models/embedding]
+
+  admin:
+    <<: *backend
+    profiles: [admin]
+    environment:
+      INCIDENTCLUE_DATABASE_URL: ${INCIDENTCLUE_COMPOSE_DATABASE_URL:-postgresql://incidentclue:local-development-only@postgres:5432/incidentclue}
+    volumes:
+      - *model-volume
+    entrypoint: [python, -m, incidentclue.rag]
+    command: [--help]
 
 volumes:
   postgres-data:

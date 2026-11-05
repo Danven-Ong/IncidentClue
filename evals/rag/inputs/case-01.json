@@ -1,0 +1,20 @@
+{
+  "incident": {
+    "incident_id": "case-01",
+    "service": "orders",
+    "summary": "Service fails during initialization.",
+    "evidence": [
+      {
+        "id": "O1",
+        "timestamp": "2026-09-15T10:00:00Z",
+        "kind": "log",
+        "content": "Required setting STOCK_ENDPOINT is absent from the effective process environment."
+      }
+    ]
+  },
+  "health": {
+    "service": "orders",
+    "evidence": []
+  },
+  "logs": null
+}

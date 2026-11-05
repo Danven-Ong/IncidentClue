@@ -1,0 +1,9 @@
+{
+  "review_contract": "decision-v2",
+  "annotation_file": "decision-expectations-development.v1.json",
+  "annotation_sha256": "af424f579b28a0bac4cec76c0fc83ee41f570b2d3bd312dabe4104c2ac17066a",
+  "fixture_sha256": "e25ab7f40b4afa21f6ecf648982df1474bad2c741c83456cd42b9f872905a6b7",
+  "split": "development",
+  "annotation_version": 1,
+  "annotation_status": "proposed_assistant_annotations_not_independent_ground_truth"
+}

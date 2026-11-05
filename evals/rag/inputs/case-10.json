@@ -1,0 +1,20 @@
+{
+  "incident": {
+    "incident_id": "case-10",
+    "service": "fulfilment",
+    "summary": "Errors increased near a release.",
+    "evidence": [
+      {
+        "id": "O1",
+        "timestamp": "2026-09-15T10:00:00Z",
+        "kind": "log",
+        "content": "A deployment occurred at 10:00 and errors increased at 10:01. No error categories or version compatibility observations were collected."
+      }
+    ]
+  },
+  "health": {
+    "service": "fulfilment",
+    "evidence": []
+  },
+  "logs": null
+}

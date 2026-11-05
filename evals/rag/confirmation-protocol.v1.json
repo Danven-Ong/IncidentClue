@@ -1,0 +1,27 @@
+{
+  "schema_version": 1,
+  "source_commit": "a76e193d26d6f0f51f73e3b3c1a1d1f8a289b724",
+  "policy": "Unchanged v3 nearest-title-passage runbook selection, Mechanism then Checks, existing source/context bounds",
+  "fixed_cutoff": 0.3,
+  "development_control_operations": 24,
+  "held_out_cases": 12,
+  "held_out_operations": 36,
+  "maximum_retrieval_operations": 60,
+  "maximum_passage_vectors": 72,
+  "maximum_query_vectors": 24,
+  "controls": "Replay archived v3 runbook 0.30 and body lexical OR for all 12 development cases before opening held-out inputs. Require pinned raw/hash helpers and exact input/query/source metadata/ranks; distance tolerance 0.000001. Preserve protocol and runner hashes before first held-out access.",
+  "held_out_comparators": ["original lexical AND", "lexical OR"],
+  "confirmation_gate": {
+    "assessed": 12,
+    "answerable_cases": 6,
+    "minimum_answerable_hits": 5,
+    "no_guidance_cases": 2,
+    "maximum_no_guidance_false_matches": 0,
+    "maximum_scope_version_violations": 0,
+    "minimum_mrr": "lexical OR on held-out nonempty relevance cases"
+  },
+  "scoring": "Original frozen annotations, Precision@3 denominator three, relevance metrics over nonempty relevance sets. Load annotations only after all retrieval. No relabeling or substitutions.",
+  "stop": "One held-out pass, fixed cutoff/policy. Preserve failed or partial reports. Any failed gate prevents runtime promotion. No further tuning on these now-inspected cases; future tuning requires a fresh held-out set.",
+  "promotion": "Conditional only: successful retrieval confirmation permits a separately verified runtime integration increment, not an LLM-quality claim or live evaluation authorization.",
+  "limits": ["Zero provider calls", "Zero downloads", "No Linux probe", "No application services/volumes", "No prompt/model tuning", "No push/merge/deployment", "Live generation requires separate bounded approval"]
+}

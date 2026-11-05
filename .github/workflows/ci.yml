@@ -90,6 +90,32 @@ jobs:
           assert not Path("/app/data").exists()
           '
           docker run --rm --network none --read-only --entrypoint python incidentclue:ci -m pip check
+      - name: Verify installed RAG runtime without networking
+        run: |
+          docker run --rm --network none --read-only --entrypoint python incidentclue:ci -c '
+          import importlib.util, os
+          from importlib.metadata import version
+          from pathlib import Path
+          import fastembed, onnxruntime, numpy, tokenizers, pgvector
+          from incidentclue.rag import RetrievalError
+          from incidentclue.rag.embeddings import artifact_contract, LocalEmbedder
+          from incidentclue.rag.corpus import load_corpus, RetrievalConfig
+          assert os.getuid() == 10001
+          assert importlib.util.find_spec("pytest") is None
+          for name, pin in artifact_contract()["packages"].items():
+              assert version(name) == pin
+          assert version("pgvector") == "0.5.1"
+          corpus = load_corpus(Path("/opt/incidentclue"), artifact_contract(), RetrievalConfig(max_distance=0.3))
+          assert corpus.corpus_id == "3d0820c28e00e9ec5b4e400e7d38e2898cc9ab02c04958e2532d3443f6c7a3c0"
+          assert len(corpus.passages) == 36
+          try:
+              LocalEmbedder(Path("/missing-model"))
+          except RetrievalError:
+              pass
+          else:
+              raise AssertionError("Missing model must fail without downloading")
+          '
+
       - name: Check mounted input and error record without credentials
         run: |
           set +e

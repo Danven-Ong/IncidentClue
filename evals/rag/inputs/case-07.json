@@ -1,0 +1,20 @@
+{
+  "incident": {
+    "incident_id": "case-07",
+    "service": "inventory",
+    "summary": "Some requests time out.",
+    "evidence": [
+      {
+        "id": "O1",
+        "timestamp": "2026-09-15T10:00:00Z",
+        "kind": "log",
+        "content": "One sample reports checked-out=40/40 and long waits; another for the same interval reports 2/40 and no waits. Sample origins are unverified."
+      }
+    ]
+  },
+  "health": {
+    "service": "inventory",
+    "evidence": []
+  },
+  "logs": null
+}

@@ -1,0 +1,20 @@
+{
+  "incident": {
+    "incident_id": "case-04",
+    "service": "fulfilment",
+    "summary": "New process rejects startup.",
+    "evidence": [
+      {
+        "id": "O1",
+        "timestamp": "2026-09-15T10:00:00Z",
+        "kind": "log",
+        "content": "Application supports schema 8-9; connected database reports schema 6. Startup rejected as incompatible."
+      }
+    ]
+  },
+  "health": {
+    "service": "fulfilment",
+    "evidence": []
+  },
+  "logs": null
+}

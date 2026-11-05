@@ -20,6 +20,10 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+rag = [
+    "fastembed==0.9.1",
+    "pgvector==0.5.1",
+]
 dev = [
     "httpx>=0.28,<0.29",
     "build>=1.6,<2",
@@ -35,6 +39,9 @@ incidentclue = "incidentclue.cli:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.setuptools.package-data]
+"incidentclue.rag" = ["artifact.json"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

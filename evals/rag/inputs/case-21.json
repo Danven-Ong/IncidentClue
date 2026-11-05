@@ -1,0 +1,20 @@
+{
+  "incident": {
+    "incident_id": "case-21",
+    "service": "recommendations",
+    "summary": "New instance is unready.",
+    "evidence": [
+      {
+        "id": "O1",
+        "timestamp": "2026-09-15T10:00:00Z",
+        "kind": "log",
+        "content": "Readiness=false and liveness=true. No readiness reason, startup log or dependency observations were captured."
+      }
+    ]
+  },
+  "health": {
+    "service": "recommendations",
+    "evidence": []
+  },
+  "logs": null
+}

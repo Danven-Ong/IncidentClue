@@ -22,6 +22,13 @@ Copy the returned investigation ID and replace `UUID` below:
 Docker mounts the example files at `/inputs/` and your root `.env` at
 `/config/provider.env`. Running new model requests requires `GROQ_API_KEY`.
 
+## Optional runbook retrieval
+
+After the [RAG setup](rag.md#quick-start), add `--runbooks CORPUS_ID` to the
+`durable start` command to select the ingested runbooks. Docker mounts the model
+files read-only. The CLI requires this flag explicitly; the server's corpus
+setting applies to browser/API creation.
+
 ## One-shot example
 
 ```sh

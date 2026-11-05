@@ -9,6 +9,7 @@ Python + FastAPI service for incident investigation. Use the
 - Bounded LangGraph workflow with read-only health/log tools.
 - PostgreSQL checkpoints and recovery.
 - Shared investigation engine for the REST API and CLI.
+- Optional runbook retrieval with separate saved source citations.
 
 ## Native development
 
@@ -51,6 +52,10 @@ python -m build --no-isolation --outdir dist/backend backend
 Tests use fake providers. Database cases require `INCIDENTCLUE_TEST_DATABASE_URL`
 pointing to an isolated test database; otherwise they skip. They create tables
 and records, so keep saved work separate.
+
+RAG dependencies are pinned in `requirements-rag.lock.txt` and installed by the
+standard backend Docker image. See the [RAG guide](../docs/rag.md) for setup and the
+[evaluation summary](../evals/rag/README.md) for measured results and limitations.
 
 See the [HTTP API](../docs/http-api.md), [workflow](../docs/workflow.md) and
 [CLI guide](../docs/cli.md) for usage and behavior.
