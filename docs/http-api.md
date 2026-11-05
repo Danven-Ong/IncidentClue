@@ -1,14 +1,5 @@
 # HTTP API
 
-Native server RAG opt-in uses `INCIDENTCLUE_RAG_CORPUS_ID` and
-`INCIDENTCLUE_RAG_MODEL_DIR` after explicit corpus preparation. Existing create
-payloads/routes are unchanged. Responses add nullable `retrieval`; saved state
-contains separate `retrieved_sources`, and diagnoses expose `source_ids` alongside
-observation `evidence_ids`. Old diagnoses may omit source IDs and remain readable.
-Create performs no model/embedding calls; completed resume/inspection read saved
-excerpts. The current Compose application image does not install RAG dependencies.
-See [RAG setup, bounds and compatibility](rag.md).
-
 FastAPI exposes the shared investigation engine for trusted local use. Start the
 application with the [Docker quick start](../README.md#quick-start), then open
 [Swagger UI](http://localhost:8000/docs) for request fields, response schemas and
@@ -28,7 +19,17 @@ These are backend paths. The browser uses an `/api` prefix that the proxy remove
 | POST | `/investigations/{identifier}/resume` | Continue until completion, pause or failure |
 | POST | `/investigations/{identifier}/pause` | Request a pause at a saved boundary |
 
-See [workflow and recovery](workflow.md) for saved state, budgets and crash recovery.
+See [agent workflow and recovery](workflow.md) for saved state, budgets and crash recovery.
+
+## Optional runbook retrieval
+
+Responses include optional runbook retrieval fields:
+
+| Field | Meaning |
+| --- | --- |
+| `retrieval` | Saved retrieval configuration; `null` when disabled |
+| `state.retrieved_sources` | Retrieved runbook passages, separate from incident evidence |
+| `state.diagnosis.source_ids` | References to retrieved passages cited by the diagnosis |
 
 ## Error codes
 

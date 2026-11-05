@@ -1,13 +1,5 @@
 # CLI guide
 
-Optional native RAG: after explicit corpus preparation, `start` accepts
-`--runbooks CORPUS_SHA256`. Configure `INCIDENTCLUE_RAG_MODEL_DIR` for later local
-lookup. Creation can remain paused with zero calls; inspection JSON includes the
-saved retrieval pin, `state.retrieved_sources` and diagnosis `source_ids`.
-The lookup competes for the existing two tool attempts. See the
-[RAG setup and compatibility guide](rag.md) before opting in. Current Docker
-application images retain their original non-RAG dependencies.
-
 Use the CLI through Docker—no Python installation needed. Complete the
 [main quick start](../README.md#quick-start), then run commands from the repository root.
 
@@ -29,6 +21,13 @@ Copy the returned investigation ID and replace `UUID` below:
 
 Docker mounts the example files at `/inputs/` and your root `.env` at
 `/config/provider.env`. Running new model requests requires `GROQ_API_KEY`.
+
+## Optional runbook retrieval
+
+After the [RAG setup](rag.md#quick-start), add `--runbooks CORPUS_ID` to the
+`durable start` command to select the ingested runbooks. Docker mounts the model
+files read-only. The CLI requires this flag explicitly; the server's corpus
+setting applies to browser/API creation.
 
 ## One-shot example
 

@@ -12,4 +12,6 @@ See the main README for [architecture](../README.md#architecture) and
 | [schemas.py](../backend/src/incidentclue/schemas.py), [diagnosis.py](../backend/src/incidentclue/diagnosis.py) | Data validation and evidence references |
 | [llm.py](../backend/src/incidentclue/llm.py), [tools.py](../backend/src/incidentclue/tools.py) | Model calls and snapshot tools |
 | [cli.py](../backend/src/incidentclue/cli.py) | Developer CLI |
+| [rag/](../backend/src/incidentclue/rag/), [data/runbooks/](../data/runbooks/) | Corpus validation, local embeddings, retrieval and runbook sources |
+| [compose.yaml](../compose.yaml) | Application stack with bundled RAG support and optional retrieval |
 | [data/synthetic/](../data/synthetic/), [evals/](../evals/) | Example inputs and separate evaluation criteria |

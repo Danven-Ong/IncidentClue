@@ -14,7 +14,7 @@ try {
         '.dockerignore', 'backend/Dockerfile', 'backend/pyproject.toml',
         'backend/README.md', 'backend/MANIFEST.in',
         'backend/requirements-dev.lock.txt', 'backend/requirements-runtime.lock.txt',
-        'backend/requirements-rag.candidate.txt', 'backend/requirements-rag.lock.txt'
+        'backend/requirements-rag.lock.txt'
     )
     foreach ($relative in $inputs) {
         $destination = Join-Path $context $relative

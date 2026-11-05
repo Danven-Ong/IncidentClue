@@ -34,7 +34,6 @@ CMD ["--help"]
 # RAG support ships with the application; model artifacts mount read-only.
 # Builds acquire Python wheels only, never a model or provider credentials.
 FROM builder AS rag-wheels
-COPY backend/requirements-rag.lock.txt ./backend/
 RUN python -m pip download --no-cache-dir --only-binary=:all: --no-deps \
     -r backend/requirements-rag.lock.txt --dest /rag-wheels
 
