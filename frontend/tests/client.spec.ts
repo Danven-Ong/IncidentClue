@@ -113,7 +113,7 @@ test('real API create, cooperative pause during resume, refresh, diagnosis and s
   await expect(page.locator('.status')).toHaveText('completed', { timeout: 20_000 });
   await page.getByRole('button', { name: 'H1', exact: true }).click();
   await expect(page.locator('#evidence-H1')).toBeFocused();
-  await expect(page.getByText('Hypothesis')).toBeVisible();
+  await expect(page.getByText('Hypothesis', { exact: true })).toBeVisible();
   const before = await (await request.get('/api/investigations/' + uuid)).json();
   const saved = await request.post('/api/investigations/' + uuid + '/resume');
   expect(saved.status()).toBe(200);
