@@ -1,24 +1,62 @@
 """Explicit RAG fixture validation and baseline capture; never imported by runtime."""
 import argparse
+import json
+import time
 from datetime import date
 from hashlib import sha256
-import json
 from pathlib import Path
-import time
 from types import SimpleNamespace
 
-from openai import APIStatusError
-from pydantic import ValidationError
-from incidentclue.investigation import investigate_incident
 from incidentclue.diagnosis import DiagnosisError, validate_support_excerpts
+from incidentclue.investigation import investigate_incident
 from incidentclue.lifecycle import runtime_fingerprint
 from incidentclue.llm import DEFAULT_MODEL, create_groq_client
 from incidentclue.schemas import Diagnosis, GenerationDiagnosis, Incident
 from incidentclue.tools import HealthSnapshot, LogSnapshot
+from openai import APIStatusError
+from pydantic import ValidationError
 
 ROOT = Path(__file__).resolve().parents[2]
 SUITE = Path(__file__).resolve().parent
 MAX_DIAGNOSTIC_CHARACTERS = 16_384
+
+_DIAGNOSIS_FIELDS = frozenset({
+    "status", "probable_cause", "evidence_ids", "missing_evidence", "next_checks",
+    "source_ids", "support_assessment", "evidence_links", "blocking_gaps",
+    "evidence_id", "excerpt", "relation",
+})
+_VALIDATION_TYPES = frozenset({
+    "bool_type", "datetime_type", "extra_forbidden", "float_type", "int_type",
+    "json_invalid", "list_type", "literal_error", "missing", "model_type",
+    "none_required", "string_type", "string_too_long", "string_too_short",
+    "too_long", "too_short", "union_type", "value_error",
+})
+_VALIDATION_RULES = {
+    "A hypothesis requires a nonblank probable cause.": "hypothesis_requires_cause",
+    "A hypothesis requires at least one evidence ID.": "hypothesis_requires_evidence",
+    "An insufficient-evidence result must have a null cause.": "abstention_cause_must_be_null",
+    "Support links must refer to diagnosis evidence_ids.": "support_link_outside_diagnosis_evidence",
+    "Every hypothesis evidence ID requires a support link.": "hypothesis_support_links_must_match",
+    "A hypothesis cannot declare blocking gaps.": "hypothesis_has_blocking_gaps",
+    "Abstention requires at least one blocking gap.": "abstention_requires_blocking_gap",
+    "Duplicate evidence links are not allowed.": "duplicate_evidence_links",
+    "Support assessment exceeds the 2,000-byte limit.": "support_assessment_over_byte_limit",
+}
+_DIAGNOSIS_FAILURE_CATEGORIES = {
+    "Expected exactly one tool-selection response.": "malformed_response",
+    "Provider returned an invalid tool-selection message.": "malformed_response",
+    "Provider did not complete tool selection normally.": "incomplete_response",
+    "Provider returned invalid tool calls.": "malformed_response",
+    "Inconsistent tool-selection response.": "tool_selection_contract_invalid",
+    "Expected exactly one diagnosis response choice.": "malformed_response",
+    "Provider returned an invalid diagnosis message.": "malformed_response",
+    "Provider did not complete the diagnosis normally.": "incomplete_response",
+    "Provider refused the diagnosis request.": "provider_refusal",
+    "Provider returned an unsupported tool request.": "unsupported_tool_call",
+    "Provider returned no diagnosis content.": "malformed_response",
+    "Provider response did not satisfy the diagnosis contract.": "generation_contract_invalid",
+    "Provider cited evidence outside the supplied incident or invalid support excerpts.": "reference_integrity_invalid",
+}
 
 
 def load(path):
@@ -215,9 +253,70 @@ def rejected_generation_details(error, *, diagnosis):
             try:
                 contract.model_validate_json(content)
                 result[name] = True
-            except ValidationError:
+            except ValidationError as validation_error:
                 result[name] = False
+                if name == "generation_diagnosis_contract_valid":
+                    result["generation_contract_issues"] = _safe_validation_issues(validation_error)
     return result
+
+
+def _safe_validation_issues(error, *, limit=3):
+    """Return bounded rule codes and schema paths, never inputs or error messages."""
+    try:
+        issues = error.errors(include_input=False, include_url=False)
+    except (AttributeError, TypeError, ValueError):
+        return [{"path": "$", "type": "validation_error"}]
+
+    if not isinstance(issues, list):
+        return [{"path": "$", "type": "validation_error"}]
+    result = []
+    for issue in issues[:limit]:
+        if not isinstance(issue, dict):
+            continue
+        location = issue.get("loc", ())
+        path = []
+        if isinstance(location, (list, tuple)):
+            for part in location[:8]:
+                if type(part) is int:
+                    path.append("[]")
+                elif type(part) is str and part in _DIAGNOSIS_FIELDS:
+                    path.append(part)
+                else:
+                    path.append("other")
+        code = issue.get("type")
+        safe_type = code if isinstance(code, str) and code in _VALIDATION_TYPES else "validation_error"
+        item = {"path": ".".join(path) if path else "$", "type": safe_type}
+        context = issue.get("ctx")
+        cause = context.get("error") if isinstance(context, dict) else None
+        if isinstance(cause, ValueError):
+            message = cause.args[0] if len(cause.args) == 1 and type(cause.args[0]) is str else None
+            rule = _VALIDATION_RULES.get(message)
+            if rule is not None:
+                item["rule"] = rule
+        result.append(item)
+    return result or [{"path": "$", "type": "validation_error"}]
+
+
+def failure_diagnostic(error, *, phase=None):
+    """Classify a failed evaluation using fixed labels and bounded local rule details."""
+    phase = phase if phase in {"selection", "diagnosis"} else "unknown"
+    provider = provider_error_details(error)
+    if provider is not None:
+        return {"origin": "provider", "phase": phase, "category": provider["category"]}
+
+    if isinstance(error, DiagnosisError):
+        message = error.args[0] if len(error.args) == 1 and type(error.args[0]) is str else None
+        category = _DIAGNOSIS_FAILURE_CATEGORIES.get(message, "local_validation_failure")
+        result = {"origin": "local_validation", "phase": phase, "category": category}
+        cause = error.__cause__
+        if category == "generation_contract_invalid" and isinstance(cause, ValidationError):
+            result["issues"] = _safe_validation_issues(cause)
+        return result
+
+    if isinstance(error, ValidationError):
+        return {"origin": "local_validation", "phase": phase,
+                "category": "validation_error", "issues": _safe_validation_issues(error)}
+    return {"origin": "execution", "phase": phase, "category": "unknown"}
 
 
 def recorded_generation_contract_valid(record):
@@ -362,9 +461,11 @@ def baseline(*, live, model, split, limit, output, env_file=None, case_ids=None)
                     logs=LogSnapshot.model_validate(payload["logs"]) if payload["logs"] else None,
                     events=events, steps=steps, summary=summary)
                 record.update({"status": "ok", "diagnosis": result.model_dump(mode="json")})
-            except Exception as error:
+            except Exception as error:  # noqa: BLE001 - capture all evaluation failures
                 # Keep private provider/credential detail out of captured evidence.
                 record.update({"status": "error", "error_type": type(error).__name__})
+                phase = attempts[-1].get("phase") if attempts else None
+                record["failure_diagnostic"] = failure_diagnostic(error, phase=phase)
                 details = provider_error_details(error)
                 if details is not None:
                     record["provider_error"] = details

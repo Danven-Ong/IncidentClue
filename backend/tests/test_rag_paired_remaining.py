@@ -8,6 +8,7 @@ from types import SimpleNamespace
 import pytest
 import httpx
 from openai import BadRequestError
+from openai.types.chat import ChatCompletionMessage
 
 from incidentclue.rag.context import RetrievalPin
 from incidentclue.rag.corpus import RetrievalConfig, identity, load_corpus
@@ -240,7 +241,15 @@ def test_answer_failure_continues_without_retry_and_counts_failure(monkeypatch, 
         def create(self, **request):
             if "response_format" in request:
                 if kind == "validation":
-                    raise evaluation.DiagnosisError("invalid diagnosis")
+                    invalid = {
+                        "status": "insufficient_evidence", "probable_cause": None,
+                        "evidence_ids": [], "source_ids": [], "missing_evidence": ["private gap"],
+                        "support_assessment": {"evidence_links": [], "blocking_gaps": []},
+                        "next_checks": [],
+                    }
+                    return SimpleNamespace(choices=[SimpleNamespace(
+                        message=ChatCompletionMessage(role="assistant", content=json.dumps(invalid)),
+                        finish_reason="stop")], usage=None)
                 response = httpx.Response(400, request=httpx.Request("POST", "https://example.invalid"))
                 raise BadRequestError("rejected", response=response,
                     body={"error": {"code": "json_validate_failed"}})
@@ -253,7 +262,22 @@ def test_answer_failure_continues_without_retry_and_counts_failure(monkeypatch, 
     assert summary["model_attempts"] == 15
     rows = [json.loads(line) for line in path.read_text().splitlines()]
     assert not any(r["type"] == "stopped" for r in rows)
-    assert all(r["failure_scope"] == "answer" for r in rows if r["type"] == "investigation")
+    investigations = [r for r in rows if r["type"] == "investigation"]
+    assert all(r["failure_scope"] == "answer" for r in investigations)
+    diagnostic = investigations[0]["failure_diagnostic"]
+    if kind == "validation":
+        assert diagnostic == {
+            "origin": "local_validation", "phase": "diagnosis",
+            "category": "generation_contract_invalid",
+            "issues": [{"path": "$", "type": "value_error",
+                        "rule": "abstention_requires_blocking_gap"}],
+        }
+        assert "private gap" not in json.dumps(diagnostic)
+    else:
+        assert diagnostic == {
+            "origin": "provider", "phase": "diagnosis",
+            "category": "structured_output_rejected",
+        }
 
 
 @pytest.mark.parametrize("status,code", [(429,"rate_limit_exceeded"), (401,"invalid_api_key"),

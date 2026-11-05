@@ -1,23 +1,22 @@
 """Frozen remaining-arm v3 diagnostic snapshot; v1 runner and stopped evidence are preserved."""
 
 import argparse
-from copy import deepcopy
-from hashlib import sha256
 import importlib.util
 import json
 import os
-from pathlib import Path
 import time
+from copy import deepcopy
+from hashlib import sha256
+from pathlib import Path
 from types import SimpleNamespace
 
 import psycopg
-from psycopg.rows import dict_row
-from openai.types.chat import ChatCompletionMessage
-
-from incidentclue.investigation import (
-    GRAPH_RECURSION_LIMIT, build_investigation_graph, initial_investigation_state,
-)
 from incidentclue.diagnosis import DiagnosisError
+from incidentclue.investigation import (
+    GRAPH_RECURSION_LIMIT,
+    build_investigation_graph,
+    initial_investigation_state,
+)
 from incidentclue.lifecycle import runtime_fingerprint
 from incidentclue.llm import create_groq_client
 from incidentclue.rag.context import RetrievalPin, construct_query
@@ -26,6 +25,8 @@ from incidentclue.rag.embeddings import LocalEmbedder, artifact_contract
 from incidentclue.rag.storage import ingest, prepare_schema
 from incidentclue.schemas import Incident
 from incidentclue.tools import HealthSnapshot, LogSnapshot
+from openai.types.chat import ChatCompletionMessage
+from psycopg.rows import dict_row
 
 HERE = Path(__file__).resolve().parent
 ROOT = HERE.parents[1]
@@ -213,9 +214,12 @@ def run_case(case_id, arm, payload, client, model, pin, retrieve, budget):
         state = graph.invoke(saved["state"], {"recursion_limit": GRAPH_RECURSION_LIMIT})
         saved["state"] = state
         record.update(status="ok", diagnosis=state["diagnosis"].model_dump(mode="json"))
-    except Exception as error:
+    except Exception as error:  # noqa: BLE001 - classify and preserve failed arms
+        last_node = charges[-1].get("node") if charges else None
+        phase = "diagnosis" if last_node == "diagnose" else "selection" if last_node == "decide" else None
         record.update(status="error", error_type=type(error).__name__,
-                      failure_scope="answer" if answer_failure(error, charges, attempts) else "batch")
+                      failure_scope="answer" if answer_failure(error, charges, attempts) else "batch",
+                      failure_diagnostic=suite.failure_diagnostic(error, phase=phase))
     state = saved["state"]
     record.update(elapsed_seconds=time.perf_counter() - started, model_attempts=local["models"],
         tool_attempts=local["tools"], requests=requests, responses=responses, attempts=attempts,
@@ -336,7 +340,7 @@ def main(argv=None):
                          approval=args.approve_protocol, env_file=args.env_file)
         print(json.dumps(result))
         return 0 if result["all_investigations_succeeded"] else 1
-    except Exception as error:
+    except Exception as error:  # noqa: BLE001 - keep details out of evaluation output
         print(f"Paired evaluation failed ({type(error).__name__}); preserve partial evidence.")
         return 1
 

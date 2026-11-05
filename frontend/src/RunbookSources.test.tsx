@@ -20,3 +20,19 @@ it('distinguishes a saved no-match from a lookup that has not run', () => {
   rerender(<RunbookSources state={{ retrieved_sources: [], tool_history: [{ name: 'get_runbook_context' }] }} />);
   expect(screen.getByText('The lookup returned no matching passages.')).toBeTruthy();
 });
+
+it('labels cited passages as answer-level references rather than per-check citations', () => {
+  render(<RunbookSources state={retrievalInspection().state} />);
+  expect(screen.getByRole('heading', { name: 'Answer references' })).toBeTruthy();
+  expect(screen.getByRole('button', { name: 'Dependency name resolution · Checks' })).toBeTruthy();
+  expect(screen.getByText('Referenced by the answer')).toBeTruthy();
+  expect(screen.getByText(/it does not map a passage to each check/)).toBeTruthy();
+});
+
+it('shows cited passage IDs when no matching excerpt was saved', () => {
+  render(<RunbookSources state={{ diagnosis: { source_ids: ['missing:runbook#section'] }, retrieved_sources: [],
+    tool_history: [{ name: 'get_runbook_context' }] }} />);
+  expect(screen.getAllByText('missing:runbook#section').length).toBe(1);
+  expect(screen.getAllByText(/passage unavailable/).length).toBe(1);
+  expect(screen.getByText('One or more referenced passage excerpts were not saved with this investigation.')).toBeTruthy();
+});

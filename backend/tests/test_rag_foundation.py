@@ -6,6 +6,7 @@ import shutil
 
 import httpx2
 from openai import BadRequestError, OpenAI, RateLimitError
+from pydantic import ValidationError
 import pytest
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -257,6 +258,79 @@ def test_rejected_generation_distinguishes_legacy_from_required_generation_field
     assert "source_ids" not in diagnosis_data
 
 
+def test_rejected_generation_reports_bounded_static_contract_issues():
+    content = json.dumps({
+        "status": "hypothesis", "probable_cause": "private cause", "evidence_ids": ["E1"],
+        "missing_evidence": [], "next_checks": [], "source_ids": [],
+        "support_assessment": {
+            "evidence_links": [{"evidence_id": "E1", "excerpt": "private excerpt",
+                                "relation": "private relation"}],
+            "blocking_gaps": ["private gap"],
+        },
+    })
+    response = httpx2.Response(400, request=httpx2.Request("POST", "https://invalid.example"))
+    error = BadRequestError("private provider message", response=response,
+        body={"error": {"code": "json_validate_failed", "failed_generation": content}})
+
+    diagnostic = suite.rejected_generation_details(error, diagnosis=True)
+
+    assert diagnostic["generation_diagnosis_contract_valid"] is False
+    assert diagnostic["generation_contract_issues"] == [{
+        "path": "$", "type": "value_error", "rule": "hypothesis_has_blocking_gaps"}]
+    serialized = json.dumps(diagnostic)
+    assert all(secret not in serialized for secret in (
+        "private cause", "private excerpt", "private relation", "private gap", "E1"))
+
+
+def test_failure_diagnostic_separates_provider_rejection_and_local_contract_failure():
+    response = httpx2.Response(400, request=httpx2.Request("POST", "https://invalid.example"))
+    provider_error = BadRequestError("private provider message", response=response,
+        body={"error": {"code": "json_validate_failed", "message": "private"}})
+    assert suite.failure_diagnostic(provider_error, phase="diagnosis") == {
+        "origin": "provider", "phase": "diagnosis", "category": "structured_output_rejected"}
+
+    try:
+        suite.GenerationDiagnosis.model_validate({
+            "status": "hypothesis", "probable_cause": "private cause", "evidence_ids": ["E1"],
+            "missing_evidence": [], "next_checks": [], "source_ids": [],
+            "support_assessment": {
+                "evidence_links": [{"evidence_id": "E1", "excerpt": "private excerpt",
+                                    "relation": "private relation"}],
+                "blocking_gaps": ["private gap"],
+            },
+        })
+    except ValidationError as cause:
+        local_error = suite.DiagnosisError(
+            "Provider response did not satisfy the diagnosis contract.")
+        local_error.__cause__ = cause
+
+    assert suite.failure_diagnostic(local_error, phase="diagnosis") == {
+        "origin": "local_validation", "phase": "diagnosis",
+        "category": "generation_contract_invalid",
+        "issues": [{"path": "$", "type": "value_error", "rule": "hypothesis_has_blocking_gaps"}],
+    }
+    assert "private" not in json.dumps(suite.failure_diagnostic(local_error, phase="diagnosis"))
+    assert suite.failure_diagnostic(
+        suite.DiagnosisError("Expected exactly one diagnosis response choice."),
+        phase="diagnosis",
+    ) == {
+        "origin": "local_validation", "phase": "diagnosis", "category": "malformed_response"}
+
+
+def test_safe_validation_issues_bound_count_and_hide_unknown_field_paths():
+    class UntrustedValidationError:
+        def errors(self, **kwargs):
+            return [{"loc": ("support_assessment", "private-field-name"),
+                     "type": "extra_forbidden", "input": "private-value"} for _ in range(5)]
+
+    issues = suite._safe_validation_issues(UntrustedValidationError())
+
+    assert len(issues) == 3
+    assert all(issue == {"path": "support_assessment.other", "type": "extra_forbidden"}
+               for issue in issues)
+    assert "private" not in json.dumps(issues)
+
+
 @pytest.mark.parametrize("content,expected", [("valid", True), ("missing_sources", False),
                                               ("invalid_json", False), (None, None)])
 def test_recorded_contract_uses_original_content_not_defaulted_saved_result(diagnosis_data, content, expected):
@@ -315,6 +389,8 @@ def test_capture_preserves_malformed_sdk_response_for_runtime_validation(tmp_pat
     row = json.loads(output.read_text(encoding="utf-8").splitlines()[1])
     assert row["error_type"] == "DiagnosisError"
     assert row["validation_error"] == "Expected exactly one tool-selection response."
+    assert row["failure_diagnostic"] == {
+        "origin": "local_validation", "phase": "selection", "category": "malformed_response"}
     assert row["responses"] == row["provider_usage"] == [None]
     assert row["attempts"][0]["status"] == "response_received"
     assert row["attempts"][0]["usage"] is None

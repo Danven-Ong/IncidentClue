@@ -187,6 +187,17 @@ semantic support or why the provider rejected a generation. Truncation remains
 `unknown`: character counts, JSON syntax and ending braces cannot prove it.
 These diagnostics cannot reconstruct content or usage missing from older reports.
 
+Failed evaluation rows also include `failure_diagnostic`, a data-minimized summary
+with a fixed origin (`provider`, `local_validation`, or `execution`), phase and
+category. A locally invalid diagnosis may include up to three issue records with
+schema paths, allowlisted validator types and static rule codes. Provider rejection
+classification describes the returned provider code; it does not identify the
+provider's internal rejection reason. `rejected_generation.generation_contract_issues`
+reports only local validation findings for captured content. These fields contain
+no generated values, excerpts, free-text error messages, or headers. The surrounding
+evaluation JSONL still preserves its existing requests and responses, which can
+include prompt, evidence and model text; treat the complete trace as sensitive.
+
 Paired review now reports `generation_diagnosis_contract_valid` separately from
 saved-result structure/citation checks, using original returned diagnosis content.
 It is `null` when no uniquely identified returned generation is available,
