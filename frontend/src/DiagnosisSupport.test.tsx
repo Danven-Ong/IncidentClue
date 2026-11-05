@@ -8,7 +8,7 @@ afterEach(cleanup);
 
 it('shows model explanations, declared gaps and full observation context as text', async () => {
   render(<DiagnosisSupport state={supportInspection().state} />);
-  expect(screen.getByText('Model explanations for review. Exact excerpts do not confirm causation.')).toBeTruthy();
+  expect(screen.getByText('NXDOMAIN returned before any connection attempt.')).toBeTruthy();
   expect(screen.getByText('The affected worker and request mapping is unknown.')).toBeTruthy();
   await userEvent.click(screen.getByText('Full observation E1'));
   expect(screen.getByText(/Request mapping is unknown. <script>/)).toBeTruthy();
@@ -18,10 +18,10 @@ it('shows model explanations, declared gaps and full observation context as text
 
 it('distinguishes absent legacy support from a model reporting no gaps', () => {
   const { rerender } = render(<DiagnosisSupport state={{ diagnosis: {} }} />);
-  expect(screen.getByText('No support explanation was saved for this result.')).toBeTruthy();
+  expect(screen.getByText('No support details saved.')).toBeTruthy();
   rerender(<DiagnosisSupport state={{ diagnosis: { support_assessment: { evidence_links: [], blocking_gaps: [] } } }} />);
-  expect(screen.getByText('No blocking gaps reported by the model.')).toBeTruthy();
-  expect(screen.queryByText('No support explanation was saved for this result.')).toBeNull();
+  expect(screen.queryByRole('heading', { name: 'Unresolved gaps' })).toBeNull();
+  expect(screen.queryByText('No support details saved.')).toBeNull();
 });
 
 it('keeps malformed partial support inspectable without treating it as verified', () => {

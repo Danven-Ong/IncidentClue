@@ -115,6 +115,7 @@ to supply a local model, ingest runbooks and enable retrieval in this same stack
 | [CLI guide](docs/cli.md) | Docker commands for saved and one-shot investigations |
 | [Runbook retrieval (RAG)](docs/rag.md) | Quick start for enabling optional runbook retrieval |
 | [Diagnosis pilot](docs/validation/pilot-2026-10-28.md) | Three synthetic cases, saved results and review findings |
+| [Product screenshots](docs/screenshots.md) | Diagnosis and cited runbook passages |
 
 ### Testing and validation
 
