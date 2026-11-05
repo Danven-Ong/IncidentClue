@@ -31,8 +31,8 @@ USER 10001:10001
 ENTRYPOINT ["incidentclue"]
 CMD ["--help"]
 
-# Optional RAG release target. Model artifacts are supplied read-only at runtime;
-# builds acquire Python wheels only, never a model or provider credentials.
+# RAG support ships with the application; model artifacts mount read-only.
+# Builds acquire Python wheels only, never a model or provider credentials.
 FROM builder AS rag-wheels
 COPY backend/requirements-rag.lock.txt ./backend/
 RUN python -m pip download --no-cache-dir --only-binary=:all: --no-deps \
@@ -51,5 +51,5 @@ ENV HF_HUB_OFFLINE=1 \
     INCIDENTCLUE_RAG_MODEL_DIR=/models/embedding
 USER 10001:10001
 
-# Preserve the existing non-RAG image as the default build target.
-FROM runtime AS default
+# The normal application image includes RAG support; retrieval stays opt-in.
+FROM rag AS default

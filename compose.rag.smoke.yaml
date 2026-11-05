@@ -1,7 +1,7 @@
 # Test-only override. Always use a fresh explicit Compose project name.
 services:
   smoke-init:
-    image: incidentclue:rag
+    image: ${INCIDENTCLUE_IMAGE:-incidentclue:local}
     profiles: [admin]
     user: "0:0"
     read_only: true

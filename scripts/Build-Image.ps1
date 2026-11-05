@@ -1,8 +1,7 @@
 # Build only allowlisted inputs, avoiding unrelated Windows test-directory ACLs.
 [CmdletBinding()]
 param(
-    [ValidateSet('rag', 'default')][string]$Target = 'rag',
-    [string]$Tag = 'incidentclue:rag'
+    [string]$Tag = 'incidentclue:local'
 )
 $ErrorActionPreference = 'Stop'
 $repository = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
@@ -30,7 +29,7 @@ try {
     Copy-Item -LiteralPath (Join-Path $repository 'data/runbooks/manifest.json') -Destination $corpus
     Get-ChildItem -LiteralPath (Join-Path $repository 'data/runbooks') -File -Filter '*.md' |
         Copy-Item -Destination $corpus
-    & docker build --target $Target --file (Join-Path $context 'backend/Dockerfile') --tag $Tag $context
+    & docker build --file (Join-Path $context 'backend/Dockerfile') --tag $Tag $context
     if ($LASTEXITCODE -ne 0) { throw "Container build failed with exit code $LASTEXITCODE" }
 }
 finally {
