@@ -96,7 +96,8 @@ Avoid `docker compose down -v`, which deletes saved data.
 | [Workflow and recovery](docs/workflow.md) | Investigation flow, storage and crash recovery |
 | [Code map](docs/code-map.md) | Main source files and their responsibilities |
 | [CLI guide](docs/cli.md) | Docker commands for saved and one-shot investigations |
-| [RAG work in progress](docs/rag.md) | Optional native corpus preparation, bounded graph lookup and saved source citations; quality evaluation pending |
+| [Containerized RAG](docs/rag-container.md) | Optional v1 RAG image, model mount, separate vector database and offline restart verification |
+| [RAG evaluation](docs/rag.md) | Retrieval contract, saved source citations and measured quality limitations |
 | [Diagnosis pilot](docs/validation/pilot-2026-10-28.md) | Three synthetic cases, saved results and review findings |
 
 ### Testing and validation

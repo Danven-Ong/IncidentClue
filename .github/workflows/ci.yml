@@ -204,6 +204,44 @@ jobs:
           python backend/tests/compose_api_smoke.py http://127.0.0.1:8080/api /tmp/one-command-created.json inspect
           docker compose -p incidentclue-startup-ci --env-file .env.example --profile frontend down
 
+  rag-container:
+    name: RAG container packaging (no model download)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out source
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - name: Build optional RAG image
+        run: docker build --target rag --file backend/Dockerfile --tag incidentclue:rag-ci .
+      - name: Verify installed RAG runtime without networking
+        run: |
+          docker run --rm --network none --read-only --entrypoint python incidentclue:rag-ci -m pip check
+          docker run --rm --network none --read-only --entrypoint python incidentclue:rag-ci -c '
+          import importlib.util, os
+          from importlib.metadata import version
+          from pathlib import Path
+          import fastembed, onnxruntime, numpy, tokenizers, pgvector
+          from incidentclue.rag import RetrievalError
+          from incidentclue.rag.embeddings import artifact_contract, LocalEmbedder
+          from incidentclue.rag.corpus import load_corpus, RetrievalConfig
+          assert os.getuid() == 10001
+          assert importlib.util.find_spec("pytest") is None
+          for name, pin in artifact_contract()["packages"].items():
+              assert version(name) == pin
+          assert version("pgvector") == "0.5.1"
+          corpus = load_corpus(Path("/opt/incidentclue"), artifact_contract(), RetrievalConfig(max_distance=0.3))
+          assert corpus.corpus_id == "3d0820c28e00e9ec5b4e400e7d38e2898cc9ab02c04958e2532d3443f6c7a3c0"
+          assert len(corpus.passages) == 36
+          try:
+              LocalEmbedder(Path("/missing-model"))
+          except RetrievalError:
+              pass
+          else:
+              raise AssertionError("Missing model must fail without downloading")
+          '
+
   postgres:
     name: PostgreSQL recovery (Python ${{ matrix.python }})
     runs-on: ubuntu-latest
@@ -300,15 +338,16 @@ jobs:
 
   gate:
     name: CI gate
-    needs: [backend, container, postgres, frontend]
+    needs: [backend, container, rag-container, postgres, frontend]
     if: ${{ always() }}
     runs-on: ubuntu-latest
     timeout-minutes: 2
     env:
       BACKEND_RESULT: ${{ needs.backend.result }}
       CONTAINER_RESULT: ${{ needs.container.result }}
+      RAG_CONTAINER_RESULT: ${{ needs.rag-container.result }}
       POSTGRES_RESULT: ${{ needs.postgres.result }}
       FRONTEND_RESULT: ${{ needs.frontend.result }}
     steps:
       - name: Require backend, container and PostgreSQL checks to succeed
-        run: test "$BACKEND_RESULT" = success && test "$CONTAINER_RESULT" = success && test "$POSTGRES_RESULT" = success && test "$FRONTEND_RESULT" = success
+        run: test "$BACKEND_RESULT" = success && test "$CONTAINER_RESULT" = success && test "$RAG_CONTAINER_RESULT" = success && test "$POSTGRES_RESULT" = success && test "$FRONTEND_RESULT" = success

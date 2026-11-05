@@ -1,0 +1,31 @@
+# Test-only override. Always use a fresh explicit Compose project name.
+services:
+  smoke-init:
+    image: incidentclue:rag
+    profiles: [admin]
+    user: "0:0"
+    read_only: true
+    network_mode: none
+    volumes:
+      - smoke-results:/results
+    entrypoint: [python, -c]
+    command: ["import os; os.chown('/results', 10001, 10001)"]
+  admin:
+    depends_on:
+      postgres:
+        condition: service_healthy
+      smoke-init:
+        condition: service_completed_successfully
+    volumes:
+      - type: bind
+        source: ./backend/tests/container_rag_smoke.py
+        target: /smoke.py
+        read_only: true
+        bind:
+          create_host_path: false
+      - smoke-results:/results
+networks:
+  default:
+    internal: true
+volumes:
+  smoke-results:

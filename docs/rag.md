@@ -1,5 +1,11 @@
 # Retrieval contract (implementation in progress)
 
+For the optional containerized **v1** delivery workflow, see
+[Containerized v1 RAG](rag-container.md). It supplies pinned Linux embedding
+dependencies, the packaged corpus and a separate PostgreSQL/vector stack. RAG
+remains disabled by default; quality limitations below remain unchanged. Earlier
+native-only environment observations describe the prior experimental setup.
+
 ## Inspectable diagnosis support
 
 New generations now require `support_assessment` in the same diagnosis request:
@@ -235,19 +241,22 @@ source citations for CLI/API/browser inspection. Administrative operations do no
 call Groq; integration tests use fake model responses. Live quality is unmeasured.
 
 The seven storage tests pass against an isolated PostgreSQL 17/vector 0.8.1
-container, using deterministic test vectors. No application extension image has
-been adopted, no existing volume has been changed, and no retrieval relevance or
-end-to-end improvement is claimed.
+container, using deterministic test vectors. The optional container workflow now
+uses a pinned PostgreSQL/vector image and real CPU embeddings. Existing app
+volumes remain separate; no retrieval relevance or end-to-end quality improvement
+is claimed by packaging verification.
 
 ## Optional preparation and probes
 
 Keep the normal application setup for non-RAG use. Optional candidate dependencies
 are listed in `backend/requirements-rag.candidate.txt`; they have prior Windows/Linux
 3.12/3.13 binary-resolution probes and a Windows/Python 3.12 CPU execution check.
-Native Linux and Python 3.13 embedding execution remain unverified. The base
-runtime lock and Docker image do not install the optional dependencies.
+The separate `backend/requirements-rag.lock.txt` now supplies the optional Linux
+amd64/Python 3.13 container, verified with the existing model and real SQL.
+The base runtime lock and default Docker target still omit optional dependencies.
 
-This candidate is provisional, not an adopted platform lock. In a separate test
+The historical candidate file remains provisional; use the container lock for
+the shipped optional target. For native experiments in a separate test
 environment, explicitly install that candidate and the built application
 wheel before embedding/ingestion. Inspect the candidate before installing: this is a
 separate dependency setup step, not a request-time operation. No command below
@@ -331,8 +340,9 @@ For new investigations on a native API server, set `INCIDENTCLUE_RAG_CORPUS_ID`
 in its process environment. Set `INCIDENTCLUE_RAG_MODEL_DIR` to the verified model
 directory for lookup. HTTP creation payloads/routes are unchanged, with no browser
 toggle. Default is disabled. One-shot `diagnose`/`investigate` remain non-RAG and
-database-independent. Compose retains its original image/dependencies: native
-optional setup does not imply the application container supports embeddings.
+database-independent. Standard Compose retains its original non-RAG image.
+The separate `compose.rag.yaml` uses the `rag` target with embedding support;
+see [the container workflow](rag-container.md).
 
 Creation reads the prepared corpus and saves corpus/artifact/config hashes plus
 the query policy, with zero charged attempts and no embedding/provider calls.

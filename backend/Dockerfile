@@ -1,7 +1,7 @@
 FROM python:3.13-slim-trixie@sha256:2d44738ebf4ce5f63b9d9ea871e9c7cfdc0426f7b0c97cac915fd88ded1d86bb AS builder
 
 WORKDIR /build
-COPY backend/requirements-dev.lock.txt backend/requirements-runtime.lock.txt ./backend/
+COPY backend/requirements-*.txt ./backend/
 RUN python -m pip install --no-cache-dir --only-binary=:all: \
     -c backend/requirements-dev.lock.txt build setuptools wheel
 COPY backend/pyproject.toml backend/README.md backend/MANIFEST.in ./backend/
@@ -30,3 +30,26 @@ WORKDIR /app
 USER 10001:10001
 ENTRYPOINT ["incidentclue"]
 CMD ["--help"]
+
+# Optional RAG release target. Model artifacts are supplied read-only at runtime;
+# builds acquire Python wheels only, never a model or provider credentials.
+FROM builder AS rag-wheels
+COPY backend/requirements-rag.lock.txt ./backend/
+RUN python -m pip download --no-cache-dir --only-binary=:all: --no-deps \
+    -r backend/requirements-rag.lock.txt --dest /rag-wheels
+
+FROM runtime AS rag
+USER root
+COPY --from=rag-wheels /rag-wheels /rag-wheels
+RUN python -m pip install --no-cache-dir --no-index /rag-wheels/*.whl \
+    && python -m pip check \
+    && rm -rf /rag-wheels
+COPY data/runbooks/manifest.json data/runbooks/*.md /opt/incidentclue/data/runbooks/
+ENV HF_HUB_OFFLINE=1 \
+    TRANSFORMERS_OFFLINE=1 \
+    HF_HUB_DISABLE_TELEMETRY=1 \
+    INCIDENTCLUE_RAG_MODEL_DIR=/models/embedding
+USER 10001:10001
+
+# Preserve the existing non-RAG image as the default build target.
+FROM runtime AS default
