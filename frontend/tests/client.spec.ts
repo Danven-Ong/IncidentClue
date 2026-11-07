@@ -44,17 +44,28 @@ test('partial state and untrusted evidence remain readable text', async ({ page 
   await expect(page.getByText('No validated diagnosis saved.')).toBeVisible();
 });
 
-test('saved runbook citations focus exact excerpts and remain readable on narrow screens', async ({ page }) => {
-  await page.route('**/api/investigations/**', route => route.fulfill({ json: retrievalInspection() }));
+test('saved runbook citations focus the whole runbook and remain readable on narrow screens', async ({ page }) => {
+  const data = retrievalInspection();
+  const source = (data.state.retrieved_sources as Record<string, unknown>[])[0];
+  data.state.retrieved_sources = [source, { ...source, id: 'same-runbook-mechanism', section: 'Mechanism', text: 'Additional mechanism passage.' }];
+  await page.route('**/api/investigations/**', route => route.fulfill({ json: data }));
   await page.goto('/#/investigations/' + id);
-  await page.getByRole('button', { name: 'Dependency name resolution · Checks', exact: true }).click();
+  await page.getByRole('button', { name: 'Dependency name resolution · v1', exact: true }).click();
   await expect(page.locator('article[id^="source-"]')).toBeFocused();
   await expect(page.locator('article[id^="source-"]').getByText(/<script>window.bad=true<\/script>/)).toBeVisible();
   expect(await page.evaluate(() => 'bad' in window)).toBe(false);
-  await page.getByText('Source identity and location', { exact: true }).click();
+  await expect(page.locator('article[id^="source-"] .runbook-passage')).toHaveCount(2);
+  await expect(page.getByText('Additional mechanism passage.', { exact: true })).toBeVisible();
+  await page.getByText('Source details', { exact: true }).first().click();
   for (const width of [1280, 375]) {
     await page.setViewportSize({ width, height: 900 });
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+    const diagnosis = await page.locator('.report-main').boundingBox();
+    const sources = await page.locator('.runbook-panel').boundingBox();
+    expect(diagnosis).not.toBeNull();
+    expect(sources).not.toBeNull();
+    if (width > 900) expect(sources!.x).toBeGreaterThanOrEqual(diagnosis!.x + diagnosis!.width);
+    else expect(sources!.y).toBeGreaterThanOrEqual(diagnosis!.y + diagnosis!.height);
     if (process.env.INCIDENTCLUE_RAG_SCREENSHOT_DIR)
       await page.screenshot({ path: resolve(process.env.INCIDENTCLUE_RAG_SCREENSHOT_DIR, `runbooks-${width}.png`), fullPage: true });
   }
@@ -102,7 +113,7 @@ test('real API create, cooperative pause during resume, refresh, diagnosis and s
   await expect(page.locator('.status')).toHaveText('completed', { timeout: 20_000 });
   await page.getByRole('button', { name: 'H1', exact: true }).click();
   await expect(page.locator('#evidence-H1')).toBeFocused();
-  await expect(page.getByText('Hypothesis · unconfirmed')).toBeVisible();
+  await expect(page.getByText('Hypothesis', { exact: true })).toBeVisible();
   const before = await (await request.get('/api/investigations/' + uuid)).json();
   const saved = await request.post('/api/investigations/' + uuid + '/resume');
   expect(saved.status()).toBe(200);

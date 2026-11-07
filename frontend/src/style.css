@@ -14,9 +14,9 @@
   --error:#f0aaa6
 }
 .support-assessment { margin-top:24px }
-.support-assessment > .hint { margin-bottom:16px }
 .support-link { padding:16px 0; border-top:1px solid var(--line) }
-.support-link blockquote { margin:8px 0; padding:0; color:var(--accent); overflow-wrap:anywhere }
+.support-label { color:var(--muted); font-size:12px }
+.support-link blockquote { margin:12px 0; padding:0 0 0 12px; border-left:2px solid var(--line); font:inherit; color:inherit; overflow-wrap:anywhere }
 .support-link details { margin-top:8px }
 .support-assessment > h3:not(:first-child) { margin-top:20px }
 * {
@@ -108,6 +108,7 @@ button.reference {
   padding:3px 9px;
   min-height:30px
 }
+button.runbook-reference { font-size:13px; white-space:normal; text-align:left; overflow-wrap:anywhere; max-width:100% }
 input,textarea,select {
   background:var(--field);
   color:inherit;
@@ -205,7 +206,7 @@ li+li {
   padding-left:18px
 }
 main {
-  max-width:1000px;
+  max-width:1200px;
   margin:0 auto;
   padding:28px 28px 64px
 }
@@ -247,10 +248,6 @@ main {
   color:var(--muted);
   font-size:12px;
   margin-top:10px
-}
-.entry #health-help {
-  margin-top:-8px;
-  margin-bottom:20px
 }
 .actions {
   display:flex;
@@ -391,7 +388,42 @@ main {
 }
 .result-grid {
   margin-top:22px;
-  gap:32px
+  gap:24px;
+  grid-template-columns:repeat(auto-fit,minmax(min(100%,220px),1fr))
+}
+.report-layout {
+  display:grid;
+  grid-template-columns:minmax(0,1fr);
+  gap:32px;
+  margin-top:24px;
+  align-items:start
+}
+.report-layout:has(.runbook-panel) {
+  grid-template-columns:minmax(0,1fr) minmax(280px,340px)
+}
+.report-main,.runbook-panel { min-width:0 }
+.report-layout .content-section { margin-top:0 }
+.runbook-panel {
+  border:1px solid var(--line);
+  border-radius:8px;
+  background:var(--surface);
+  padding:20px
+}
+.runbook-panel .evidence { padding:20px 0 }
+.runbook-panel .evidence:last-child { border-bottom:0; padding-bottom:0 }
+.runbook-panel details { font-size:12px; margin-bottom:0 }
+.source-heading { display:flex; align-items:start; gap:12px; margin-bottom:16px }
+.runbook-passage+.runbook-passage { border-top:1px solid var(--line); margin-top:20px; padding-top:20px }
+.passage-heading { display:flex; align-items:baseline; gap:12px; margin-bottom:12px }
+.passage-heading h4 { font-size:14px; font-weight:500; margin:0 }
+.source-heading h3 { margin-bottom:2px }
+.source-heading .muted { font-size:12px }
+.source-excerpt p:empty { display:none }
+.source-excerpt p+p { margin-top:12px }
+.citation-label { align-self:center; color:var(--muted); font-size:12px }
+.finding .references { display:inline-flex; margin-right:16px }
+@media(max-width:900px) {
+  .report-layout:has(.runbook-panel) { grid-template-columns:minmax(0,1fr); gap:0 }
 }
 .evidence {
   padding:16px 0;

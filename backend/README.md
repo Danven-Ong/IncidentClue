@@ -3,14 +3,6 @@
 Python + FastAPI service for incident investigation. Use the
 [Docker quick start](../README.md#quick-start) to run the complete application.
 
-## Features
-
-- Validated incident inputs and evidence-linked diagnoses.
-- Bounded LangGraph workflow with read-only health/log tools.
-- PostgreSQL checkpoints and recovery.
-- Shared investigation engine for the REST API and CLI.
-- Optional runbook retrieval with separate saved source citations.
-
 ## Native development
 
 Requires Python 3.12+. From the repository root:

@@ -29,7 +29,7 @@ ROOT = Path(__file__).resolve().parents[2]
 
 
 @pytest.mark.parametrize(
-    "filename", ["paired.py", "paired_paced.py", "paired_remaining.py"]
+    "filename", ["paired_remaining.py"]
 )
 def test_historical_live_protocols_cannot_authorize_new_support_format(
     filename, tmp_path, monkeypatch

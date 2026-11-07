@@ -81,7 +81,6 @@ export function NewIncident({ active }: { active: boolean }) {
         <label>Incident evidence · JSON<textarea className="code" required rows={3} spellCheck={false} {...fields('evidence')} /></label>
         <label>Health snapshot · JSON<textarea className="code" required rows={6} spellCheck={false}
           placeholder={'{"service":"checkout","evidence":[]}'} {...fields('health')} /></label>
-        <p id="health-help" className="hint">Recorded data. Empty evidence means no observations.</p>
         <details><summary>Optional logs and model</summary>
           <label>Logs · JSON<textarea className="code" rows={4} spellCheck={false} placeholder="null" {...fields('logs')} /></label>
           <label>Model<input maxLength={200} placeholder="Server default" {...fields('model')} /></label>
