@@ -6,6 +6,8 @@ and optional Retrieval-Augmented Generation (RAG) to investigate recorded logs
 and service health. PostgreSQL checkpointing preserves evidence and progress
 across pauses and restarts.
 
+![Completed investigation with evidence and runbook guidance](docs/images/completed-investigation.png)
+
 ## Contents
 
 - [Technology choices](#technology-choices)
@@ -107,15 +109,14 @@ to supply a local model, ingest runbooks and enable retrieval in this same stack
 
 | Guide | Contents |
 | --- | --- |
-| [Backend](backend/README.md) | Features, development and tests |
-| [Frontend](frontend/README.md) | Features, development and tests |
+| [Backend](backend/README.md) | Development and tests |
+| [Frontend](frontend/README.md) | Development and tests |
 | [HTTP API](docs/http-api.md) | Endpoints, Swagger UI and error codes |
 | [Agent workflow and recovery](docs/workflow.md) | Investigation flow, storage and crash recovery |
 | [Code map](docs/code-map.md) | Main source files and their responsibilities |
 | [CLI guide](docs/cli.md) | Docker commands for saved and one-shot investigations |
 | [Runbook retrieval (RAG)](docs/rag.md) | Quick start for enabling optional runbook retrieval |
 | [Diagnosis pilot](docs/validation/pilot-2026-10-28.md) | Three synthetic cases, saved results and review findings |
-| [Product screenshots](docs/screenshots.md) | Diagnosis and cited runbook passages |
 
 ### Testing and validation
 

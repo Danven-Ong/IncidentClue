@@ -3,12 +3,6 @@
 React + TypeScript + Vite interface. Use the
 [Docker quick start](../README.md#quick-start) to run the complete application.
 
-## Features
-
-- Create investigations and reopen saved work by UUID.
-- View diagnoses, linked evidence and saved activity.
-- Resume or request pause, with visible attempt budgets.
-
 ## Development
 
 Requires Node 24.15+ within the Node 24 line and a running API.
